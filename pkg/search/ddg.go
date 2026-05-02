@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/1broseidon/ketch/internal/httpx"
+	"github.com/1broseidon/ketch/pkg/httpx"
 	"github.com/PuerkitoBio/goquery"
 )
 

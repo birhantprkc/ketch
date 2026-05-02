@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/1broseidon/ketch/internal/httpx"
+	"github.com/1broseidon/ketch/pkg/httpx"
 )
 
 // Context7 searches library documentation via the Context7 API.

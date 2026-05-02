@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/1broseidon/ketch/internal/extract"
-	"github.com/1broseidon/ketch/internal/httpx"
+	"github.com/1broseidon/ketch/pkg/extract"
+	"github.com/1broseidon/ketch/pkg/httpx"
 	"github.com/PuerkitoBio/goquery"
 )
 

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/1broseidon/ketch/internal/config"
+	"github.com/1broseidon/ketch/pkg/config"
 	"github.com/spf13/cobra"
 )
 

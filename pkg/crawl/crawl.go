@@ -11,9 +11,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/1broseidon/ketch/internal/cache"
-	"github.com/1broseidon/ketch/internal/httpx"
-	"github.com/1broseidon/ketch/internal/scrape"
+	"github.com/1broseidon/ketch/pkg/cache"
+	"github.com/1broseidon/ketch/pkg/httpx"
+	"github.com/1broseidon/ketch/pkg/scrape"
 	"github.com/PuerkitoBio/goquery"
 )
 
