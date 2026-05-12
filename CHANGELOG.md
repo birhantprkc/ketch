@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Page cache no longer returns unrendered JS-shell garbage after the user configures a browser. Entries now record the fetch source (`http` / `http_shell` / `browser`); a cache hit is bypassed when the entry was an unrendered JS-shell extraction and a browser is now available. Plain HTTP entries are not churned by browser config changes. Pre-existing entries (no source recorded) are invalidated once when a browser is configured, migrating them in place. Fixes #7.
 
+## [0.8.0] - 2026-05-02
+
+### Changed
+- Reusable packages moved from `internal/` to `pkg/`. Affected: `cache`, `code`, `config`, `crawl`, `docs`, `extract`, `httpx`, `scrape`, `search`, `updatecheck`. Pure rename, no behavior changes — exposes these packages for import by external Go programs. The `internal/` directory is removed; any out-of-tree code that imported `github.com/1broseidon/ketch/internal/<pkg>` (Go's visibility rules already prohibited this from outside the module) must switch to `github.com/1broseidon/ketch/pkg/<pkg>`.
+
 ## [0.7.1] - 2026-04-21
 
 ### Fixed
