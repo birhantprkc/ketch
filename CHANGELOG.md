@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-05-12
+
+### Changed
+- **BREAKING.** Reusable packages moved from `pkg/<pkg>` to the module root. Import paths change from `github.com/1broseidon/ketch/pkg/<pkg>` to `github.com/1broseidon/ketch/<pkg>` for `cache`, `code`, `config`, `crawl`, `docs`, `extract`, `httpx`, `scrape`, `search`, and `updatecheck`. The `pkg/` prefix is a community convention (golang-standards/project-layout) that the Go team has explicitly not endorsed; stdlib and most idiomatic libraries expose packages at the module root.
+- VitePress documentation site moved from `docs/` to `site/` to free the `docs/` path for the docs-search Go package (context7 / FTS5 backends). The Deploy Docs workflow and `.gitignore` are updated. Site URL is unaffected (gh-pages serves from a separate branch).
+
 ## [0.8.1] - 2026-05-12
 
 ### Fixed
