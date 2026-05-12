@@ -191,11 +191,12 @@ func (c *crawler) tryVisit(u string) bool {
 }
 
 func (c *crawler) processItem(item queueItem) {
-	cached := c.pc.Get(item.url)
+	cached, cachedSource := c.pc.Get(item.url)
 
-	// Cache hit: use cached page, skip fetch entirely.
+	// Cache hit: use cached page, skip fetch entirely, unless the entry
+	// is an unrendered JS-shell extraction and a browser is now available.
 	// Use --no-cache to force re-fetch for change detection.
-	if cached != nil {
+	if cached != nil && !scrape.CacheStaleForBrowser(cachedSource, c.scraper.HasBrowser()) {
 		c.fn(Result{
 			Page:   cached,
 			Depth:  item.depth,
@@ -210,11 +211,13 @@ func (c *crawler) processItem(item queueItem) {
 	var rawHTML string
 	var doc *goquery.Document
 	var err error
+	fetchSource := scrape.SourceHTTP
 
 	// If >80% of pages on this host are JS shells (after 10+ samples),
 	// skip detection and go straight to browser rendering.
 	if c.shouldForceBrowser(item.url) && c.scraper.HasBrowser() {
 		page, rawHTML, err = c.scraper.BrowserScrape(c.ctx, item.url)
+		fetchSource = scrape.SourceBrowser
 	} else {
 		var result *scrape.FetchResult
 		result, err = c.scraper.ScrapeConditional(c.ctx, item.url, "", "")
@@ -222,6 +225,7 @@ func (c *crawler) processItem(item queueItem) {
 			page = result.Page
 			rawHTML = result.RawHTML
 			doc = result.Doc // may be nil when the page was re-fetched via browser
+			fetchSource = result.Source
 			c.recordJSDetection(item.url, result.JSDetection)
 		}
 	}
@@ -236,7 +240,7 @@ func (c *crawler) processItem(item queueItem) {
 		return
 	}
 
-	c.pc.Put(item.url, page)
+	c.pc.Put(item.url, page, fetchSource)
 	c.fn(Result{
 		Page:   page,
 		Depth:  item.depth,

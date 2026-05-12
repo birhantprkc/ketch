@@ -20,6 +20,21 @@ import (
 // Prevents a malicious or misconfigured server from OOMing the process.
 const MaxBodyBytes = 20 << 20 // 20 MiB
 
+// Source identifies how a Page was fetched. Stored in the cache so we can
+// invalidate stale entries (notably JS-shell extractions cached before the
+// user configured a browser) without churning entries for plain HTTP pages
+// that don't need rendering.
+const (
+	// SourceHTTP — page is not a JS shell; plain HTTP fetch is authoritative.
+	SourceHTTP = "http"
+	// SourceHTTPShell — page is a JS shell but rendering wasn't possible
+	// (no browser configured, or browser fetch failed). Always invalid as a
+	// cache hit when a browser is now available, so we retry rendering.
+	SourceHTTPShell = "http_shell"
+	// SourceBrowser — page was rendered via the headless browser.
+	SourceBrowser = "browser"
+)
+
 // Page represents a scraped web page.
 type Page struct {
 	URL          string `json:"url"`
@@ -43,6 +58,9 @@ type FetchResult struct {
 	// was re-fetched via the browser — in that case RawHTML is the
 	// rendered HTML and needs a fresh parse.
 	Doc *goquery.Document
+
+	// Source is the fetch path that produced Page (SourceHTTP or SourceBrowser).
+	Source string
 }
 
 // Scraper fetches web pages and extracts content as markdown.
@@ -111,27 +129,28 @@ func (s *Scraper) getBrowser() BrowserConn {
 	return s.browser
 }
 
-// Scrape fetches a URL and returns extracted markdown content.
-// If the page appears JS-rendered and a browser is configured, automatically
-// retries with the browser for full content extraction.
-func (s *Scraper) Scrape(ctx context.Context, rawURL string) (*Page, error) {
+// Scrape fetches a URL and returns extracted markdown content along with the
+// fetch source (SourceHTTP or SourceBrowser). If the page appears JS-rendered
+// and a browser is configured, automatically retries with the browser for full
+// content extraction.
+func (s *Scraper) Scrape(ctx context.Context, rawURL string) (*Page, string, error) {
 	body, err := s.Fetch(ctx, rawURL)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	body = s.MaybeBrowserFetch(ctx, rawURL, body)
+	body, source := s.MaybeBrowserFetch(ctx, rawURL, body)
 
 	result, err := s.extractor.Extract(rawURL, body)
 	if err != nil {
-		return nil, fmt.Errorf("extraction failed for %s: %w", rawURL, err)
+		return nil, "", fmt.Errorf("extraction failed for %s: %w", rawURL, err)
 	}
 
 	return &Page{
 		URL:      rawURL,
 		Title:    result.Title,
 		Markdown: result.Markdown,
-	}, nil
+	}, source, nil
 }
 
 // ScrapeConditional fetches a URL with conditional headers and JS detection.
@@ -179,8 +198,9 @@ func (s *Scraper) ScrapeConditional(ctx context.Context, rawURL, etag, lastModif
 		detection = extract.DetectJSShellFromDoc(doc, html)
 	}
 
+	source := SourceHTTP
 	if detection == "likely_shell" {
-		html = s.browserFetchOrWarn(ctx, rawURL, html)
+		html, source = s.browserFetchOrWarn(ctx, rawURL, html)
 		doc = nil // rendered HTML needs a fresh parse downstream
 	}
 
@@ -201,6 +221,7 @@ func (s *Scraper) ScrapeConditional(ctx context.Context, rawURL, etag, lastModif
 		},
 		RawHTML:     html,
 		JSDetection: detection,
+		Source:      source,
 	}, nil
 }
 
@@ -229,27 +250,47 @@ func (s *Scraper) BrowserScrape(ctx context.Context, rawURL string) (*Page, stri
 }
 
 // MaybeBrowserFetch re-fetches rawURL via the browser if html looks JS-rendered.
-// Returns the original html if no browser is needed or available.
-func (s *Scraper) MaybeBrowserFetch(ctx context.Context, rawURL, html string) string {
+// Returns the (possibly rendered) html and the fetch source actually used.
+func (s *Scraper) MaybeBrowserFetch(ctx context.Context, rawURL, html string) (string, string) {
 	detection := extract.DetectJSShell(html)
 	if detection != "likely_shell" {
-		return html
+		return html, SourceHTTP
 	}
 	return s.browserFetchOrWarn(ctx, rawURL, html)
 }
 
-func (s *Scraper) browserFetchOrWarn(ctx context.Context, rawURL, html string) string {
+// browserFetchOrWarn returns the rendered html with SourceBrowser on success,
+// or the original (shell) html with SourceHTTPShell if the browser is
+// unavailable or fails. Called only when detection said "likely_shell", so
+// returning SourceHTTP here would be a lie — the entry would round-trip as
+// "plain page" and never get retried once a browser is configured.
+func (s *Scraper) browserFetchOrWarn(ctx context.Context, rawURL, html string) (string, string) {
 	browser := s.getBrowser()
 	if browser != nil {
 		rendered, err := browser.Fetch(ctx, rawURL)
 		if err == nil {
-			return rendered
+			return rendered, SourceBrowser
 		}
 		fmt.Fprintf(os.Stderr, "warn: browser fallback failed for %s: %v\n", rawURL, err)
 	} else if s.browserBin == "" {
 		fmt.Fprintf(os.Stderr, "warn: %s appears JS-rendered; configure browser for full content\n", rawURL)
 	}
-	return html
+	return html, SourceHTTPShell
+}
+
+// CacheStaleForBrowser reports whether a cache entry with the given source
+// should be bypassed because rendering via the browser would do better.
+// True when the cached entry is a known unrendered JS shell, or when it
+// predates source tracking and a browser is now available (one-time migration
+// for pre-source caches where the entry might be unrendered shell garbage).
+func CacheStaleForBrowser(source string, hasBrowser bool) bool {
+	if source == SourceHTTPShell {
+		return true
+	}
+	if source == "" && hasBrowser {
+		return true
+	}
+	return false
 }
 
 // ContentHash returns the first 16 hex chars of the sha256 of s.

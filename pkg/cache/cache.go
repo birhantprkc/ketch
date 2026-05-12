@@ -29,6 +29,7 @@ type Cache struct {
 
 type cacheEntry struct {
 	CachedAt int64       `json:"t"`
+	Source   string      `json:"s,omitempty"`
 	Page     scrape.Page `json:"p"`
 }
 
@@ -73,32 +74,35 @@ func DBPath() (string, error) {
 	return filepath.Join(dir, "cache.db"), nil
 }
 
-// Get looks up a cached page by URL. Returns nil if missing or expired.
-func (c *Cache) Get(url string) *scrape.Page {
+// Get looks up a cached page by URL. Returns (nil, "") if missing or expired.
+// The second return is the fetch source recorded at Put time (scrape.SourceHTTP
+// or scrape.SourceBrowser); empty for entries written before source tracking.
+func (c *Cache) Get(url string) (*scrape.Page, string) {
 	if c == nil {
-		return nil
+		return nil, ""
 	}
 	data, err := c.store.Get(cacheKey(url))
 	if err != nil {
-		return nil
+		return nil, ""
 	}
 	var e cacheEntry
 	if err := json.Unmarshal(data, &e); err != nil {
-		return nil
+		return nil, ""
 	}
 	if time.Since(time.Unix(e.CachedAt, 0)) > c.ttl {
-		return nil
+		return nil, ""
 	}
-	return &e.Page
+	return &e.Page, e.Source
 }
 
-// Put writes a page to the cache.
-func (c *Cache) Put(url string, page *scrape.Page) {
+// Put writes a page to the cache with the fetch source that produced it.
+func (c *Cache) Put(url string, page *scrape.Page, source string) {
 	if c == nil {
 		return
 	}
 	e := cacheEntry{
 		CachedAt: time.Now().Unix(),
+		Source:   source,
 		Page:     *page,
 	}
 	data, err := json.Marshal(e)

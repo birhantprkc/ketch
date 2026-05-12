@@ -168,17 +168,20 @@ func newPageCache(noCache bool) *cache.Cache {
 }
 
 // cachedScrape checks the cache first, falls back to fetch+extract.
+// Hits are bypassed when the entry was extracted from an unrendered JS shell
+// and a browser is now available to do better, or when the entry predates
+// source tracking (a one-time migration once a browser is configured).
 func cachedScrape(ctx context.Context, s *scrape.Scraper, pc *cache.Cache, url string) (*scrape.Page, error) {
-	if page := pc.Get(url); page != nil {
+	if page, source := pc.Get(url); page != nil && !scrape.CacheStaleForBrowser(source, s.HasBrowser()) {
 		return page, nil
 	}
 
-	page, err := s.Scrape(ctx, url)
+	page, source, err := s.Scrape(ctx, url)
 	if err != nil {
 		return nil, err
 	}
 
-	pc.Put(url, page)
+	pc.Put(url, page, source)
 	return page, nil
 }
 
@@ -288,7 +291,7 @@ func scrapeURLWithSelector(ctx context.Context, s *scrape.Scraper, rawURL, selec
 	if err != nil {
 		return nil, fmt.Errorf("fetch failed: %w", err)
 	}
-	html = s.MaybeBrowserFetch(ctx, rawURL, html)
+	html, _ = s.MaybeBrowserFetch(ctx, rawURL, html)
 	markdown, err := extract.ExtractSelector(html, selector)
 	if err != nil {
 		return nil, fmt.Errorf("selector extraction failed: %w", err)
