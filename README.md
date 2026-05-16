@@ -41,7 +41,7 @@ ketch scrape https://go.dev/doc/effective_go
 ketch scrape https://example.com https://go.dev
 
 # Crawl a site
-ketch crawl https://docs.example.com --depth 2
+ketch crawl https://example.com --depth 2
 
 # Crawl a sitemap in the background
 ketch crawl https://example.com/sitemap.xml --sitemap --background
@@ -90,7 +90,7 @@ Crawl entire sites via BFS link discovery or sitemaps:
 
 ```sh
 # BFS crawl from a seed URL
-ketch crawl https://docs.example.com --depth 3
+ketch crawl https://example.com --depth 3
 
 # Sitemap-based crawl
 ketch crawl https://example.com/sitemap.xml --sitemap
