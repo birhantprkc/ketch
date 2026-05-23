@@ -133,6 +133,9 @@ func searchScrape(ctx context.Context, results []search.Result, scraper *scrape.
 		words := len(strings.Fields(content))
 		fmt.Println("---")
 		fmt.Printf("url: %s\n", r.URL)
+		if page.FetchedURL != "" {
+			fmt.Printf("fetched_url: %s\n", page.FetchedURL)
+		}
 		fmt.Printf("title: %s\n", page.Title)
 		fmt.Printf("words: %d\n", words)
 		fmt.Println("---")

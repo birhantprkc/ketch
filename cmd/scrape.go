@@ -374,6 +374,9 @@ func printPage(p *scrape.Page) {
 	words := len(strings.Fields(p.Markdown))
 	fmt.Println("---")
 	fmt.Printf("url: %s\n", p.URL)
+	if p.FetchedURL != "" {
+		fmt.Printf("fetched_url: %s\n", p.FetchedURL)
+	}
 	fmt.Printf("title: %s\n", p.Title)
 	fmt.Printf("words: %d\n", words)
 	fmt.Println("---")
