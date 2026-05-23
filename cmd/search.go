@@ -10,6 +10,7 @@ import (
 	"github.com/1broseidon/ketch/cache"
 	"github.com/1broseidon/ketch/scrape"
 	"github.com/1broseidon/ketch/search"
+	"github.com/1broseidon/ketch/urlrewrite"
 	"github.com/spf13/cobra"
 )
 
@@ -52,8 +53,14 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	}
 
 	if doScrape {
+		rw, err := urlrewrite.NewRewriter(cfg.URLRewrites)
+		if err != nil {
+			return fmt.Errorf("invalid url_rewrites: %w", err)
+		}
+		scraper := scrape.NewWithRewriter(cfg.Browser, rw)
+		defer scraper.Close()
 		pc := newPageCache(false)
-		return searchScrape(cmd.Context(), results, pc, asJSON, trim, maxChars, minimal)
+		return searchScrape(cmd.Context(), results, scraper, pc, asJSON, trim, maxChars, minimal)
 	}
 
 	if asJSON {
@@ -82,9 +89,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func searchScrape(ctx context.Context, results []search.Result, pc *cache.Cache, asJSON bool, trim bool, maxChars int, minimal bool) error {
-	scraper := scrape.New()
-
+func searchScrape(ctx context.Context, results []search.Result, scraper *scrape.Scraper, pc *cache.Cache, asJSON bool, trim bool, maxChars int, minimal bool) error {
 	if asJSON {
 		for i, r := range results {
 			page, err := cachedScrape(ctx, scraper, pc, r.URL)
