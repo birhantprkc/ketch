@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-05-22
+
+### Added
+- `url_rewrites` config: an ordered list of `{match, replace}` regex rules applied transparently before any fetch in `scrape`, `search --scrape`, and `crawl`. Lets users redirect URLs without touching the agent surface — e.g. `www.reddit.com` → `old.reddit.com` (the verification-wall workaround) or `theguardian.com/uk` → `/uk/rss` (RSS-over-rendered-page). Original URL is preserved in output frontmatter as `url:`; the actually-fetched URL appears as `fetched_url:` when different. JSON output exposes both via `url` and `fetched_url`. The page cache is keyed by the rewritten URL so original/rewritten aliases share one entry. Rules validated at `ketch config set url_rewrites '<json>'` time (JSON parse + regex compile); first-match-wins; capture groups (`$1`, `$2`) supported in `replace`. Closes #9.
+
+### Changed
+- `crawl.Crawl()` signature now takes `*scrape.Scraper` from the caller (was constructed internally from `Options.BrowserBin`); `Options.BrowserBin` removed. Only affects direct importers of the `crawl` package — the `ketch crawl` CLI is unchanged. Lets the cmd-layer `newScraper()` helper own scraper construction uniformly across `scrape`, `search`, and `crawl`.
+
+### Fixed
+- Broken example URLs in README (#8, thanks @abhmul).
+
 ## [0.9.0] - 2026-05-12
 
 ### Changed
