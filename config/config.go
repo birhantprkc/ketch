@@ -8,21 +8,24 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/1broseidon/ketch/urlrewrite"
 )
 
 // Config holds user-configurable defaults for ketch.
 type Config struct {
-	Backend        string `json:"backend"`
-	SearxngURL     string `json:"searxng_url"`
-	BraveAPIKey    string `json:"brave_api_key,omitempty"`
-	Limit          int    `json:"limit"`
-	CacheTTL       string `json:"cache_ttl"`
-	Browser        string `json:"browser,omitempty"` // "chrome", "chromium", or absolute path; empty = disabled
-	CodeBackend    string `json:"code_backend,omitempty"`
-	DocsBackend    string `json:"docs_backend,omitempty"`
-	Context7APIKey string `json:"context7_api_key,omitempty"`
-	SourcegraphURL string `json:"sourcegraph_url,omitempty"`
-	GithubToken    string `json:"github_token,omitempty"`
+	Backend        string            `json:"backend"`
+	SearxngURL     string            `json:"searxng_url"`
+	BraveAPIKey    string            `json:"brave_api_key,omitempty"`
+	Limit          int               `json:"limit"`
+	CacheTTL       string            `json:"cache_ttl"`
+	Browser        string            `json:"browser,omitempty"` // "chrome", "chromium", or absolute path; empty = disabled
+	CodeBackend    string            `json:"code_backend,omitempty"`
+	DocsBackend    string            `json:"docs_backend,omitempty"`
+	Context7APIKey string            `json:"context7_api_key,omitempty"`
+	SourcegraphURL string            `json:"sourcegraph_url,omitempty"`
+	GithubToken    string            `json:"github_token,omitempty"`
+	URLRewrites    []urlrewrite.Rule `json:"url_rewrites,omitempty"`
 }
 
 // ResolveGithubToken returns a token and the source it came from, walking the
