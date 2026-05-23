@@ -104,6 +104,26 @@ ketch config init         # create default config
 ketch config set key val  # update a value
 ```
 
+### URL Rewrites
+
+Transparently rewrite request URLs before any fetch. Applied uniformly in `scrape`, `search --scrape`, and `crawl`. The original URL is preserved in output frontmatter as `url:`; the actually-fetched URL appears as `fetched_url:` when different. Cache entries are keyed by the rewritten URL so aliased URLs share content.
+
+Rules are an ordered list of `{match, replace}` pairs. `match` is a Go regexp; `replace` may reference capture groups (`$1`, `$2`, …). First match wins.
+
+```bash
+# Reddit blocks www.reddit.com even with a browser; old.reddit.com renders as HTML.
+ketch config set url_rewrites '[
+  {"match":"^https?://www\\.reddit\\.com/(.*)$","replace":"https://old.reddit.com/$1"}
+]'
+
+# News sites: pull the RSS feed instead of the rendered landing page.
+ketch config set url_rewrites '[
+  {"match":"^(https://www\\.theguardian\\.com/uk)$","replace":"$1/rss"}
+]'
+```
+
+Stored at `~/.config/ketch/config.json` under `url_rewrites`. View with `ketch config`.
+
 ### Page Cache
 
 Single bbolt database at platform cache dir (`os.UserCacheDir()/ketch/cache.db`).
