@@ -183,8 +183,9 @@ func (c *crawler) tryVisit(u string) bool {
 }
 
 func (c *crawler) processItem(item queueItem) {
-	cacheKey := c.scraper.Rewrite(item.url)
-	cached, cachedSource := c.pc.Get(cacheKey)
+	// item.url was already passed through Scraper.Rewrite in enqueue, so it
+	// is the canonical cache key — no second rewrite needed here.
+	cached, cachedSource := c.pc.Get(item.url)
 
 	// Cache hit: use cached page, skip fetch entirely, unless the entry
 	// is an unrendered JS-shell extraction and a browser is now available.
@@ -233,7 +234,7 @@ func (c *crawler) processItem(item queueItem) {
 		return
 	}
 
-	c.pc.Put(cacheKey, page, fetchSource)
+	c.pc.Put(item.url, page, fetchSource)
 	c.fn(Result{
 		Page:   page,
 		Depth:  item.depth,
