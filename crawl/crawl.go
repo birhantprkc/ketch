@@ -50,6 +50,15 @@ type hostJSStats struct {
 // Crawl performs a BFS crawl from the seed URL, calling fn for each page.
 // The context bounds the entire crawl: cancelling it stops workers promptly
 // and aborts in-flight HTTP/browser requests.
+//
+// URL rewrite rules on the Scraper apply twice along the crawl path: once in
+// enqueue (so the visited-set and cache key are canonical) and again inside
+// ScrapeConditional (which doesn't know its input was already rewritten).
+// Rules must therefore be idempotent on their own output — a rule whose
+// replacement re-matches its own pattern (e.g. `^/(.*)$ → /v2/$1`) will
+// double-apply when crawled. The documented use cases (host swaps like
+// www.reddit.com → old.reddit.com, path appends like /uk → /uk/rss) are
+// idempotent and safe.
 func Crawl(ctx context.Context, seed string, s *scrape.Scraper, opts Options, pc *cache.Cache, sitemap bool, fn func(Result)) error {
 	seedURL, err := url.Parse(seed)
 	if err != nil {
