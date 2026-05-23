@@ -8,24 +8,26 @@ import (
 	"time"
 
 	"github.com/1broseidon/ketch/config"
+	"github.com/1broseidon/ketch/urlrewrite"
 	"github.com/spf13/cobra"
 )
 
 // configInfo is the discovery payload returned by `ketch config`.
 type configInfo struct {
-	ConfigPath            string   `json:"config_path"`
-	Backend               string   `json:"backend"`
-	SearxngURL            string   `json:"searxng_url"`
-	Limit                 int      `json:"limit"`
-	CacheTTL              string   `json:"cache_ttl"`
-	Browser               string   `json:"browser,omitempty"`
-	CodeBackend           string   `json:"code_backend"`
-	DocsBackend           string   `json:"docs_backend"`
-	SourcegraphURL        string   `json:"sourcegraph_url"`
-	GithubTokenSource     string   `json:"github_token_source"`
-	AvailableBackends     []string `json:"available_backends"`
-	AvailableCodeBackends []string `json:"available_code_backends"`
-	AvailableDocBackends  []string `json:"available_doc_backends"`
+	ConfigPath            string            `json:"config_path"`
+	Backend               string            `json:"backend"`
+	SearxngURL            string            `json:"searxng_url"`
+	Limit                 int               `json:"limit"`
+	CacheTTL              string            `json:"cache_ttl"`
+	Browser               string            `json:"browser,omitempty"`
+	CodeBackend           string            `json:"code_backend"`
+	DocsBackend           string            `json:"docs_backend"`
+	SourcegraphURL        string            `json:"sourcegraph_url"`
+	GithubTokenSource     string            `json:"github_token_source"`
+	URLRewrites           []urlrewrite.Rule `json:"url_rewrites,omitempty"`
+	AvailableBackends     []string          `json:"available_backends"`
+	AvailableCodeBackends []string          `json:"available_code_backends"`
+	AvailableDocBackends  []string          `json:"available_doc_backends"`
 }
 
 var configCmd = &cobra.Command{
@@ -77,6 +79,7 @@ func runConfigShow(_ *cobra.Command, _ []string) error {
 		DocsBackend:           c.DocsBackend,
 		SourcegraphURL:        c.SourcegraphURL,
 		GithubTokenSource:     ghSource,
+		URLRewrites:           c.URLRewrites,
 		AvailableBackends:     config.AvailableBackends(),
 		AvailableCodeBackends: config.AvailableCodeBackends(),
 		AvailableDocBackends:  config.AvailableDocBackends(),
@@ -109,6 +112,19 @@ func runConfigSet(_ *cobra.Command, args []string) error {
 	c := config.Load()
 	key, value := args[0], args[1]
 
+	if err := applyConfigSet(&c, key, value); err != nil {
+		return err
+	}
+
+	if err := config.Save(c); err != nil {
+		return err
+	}
+
+	fmt.Fprintf(os.Stderr, "set %s = %s\n", key, value)
+	return nil
+}
+
+func applyConfigSet(c *config.Config, key, value string) error {
 	switch key {
 	case "backend":
 		c.Backend = value
@@ -117,16 +133,9 @@ func runConfigSet(_ *cobra.Command, args []string) error {
 	case "brave_api_key":
 		c.BraveAPIKey = value
 	case "limit":
-		n, err := strconv.Atoi(value)
-		if err != nil {
-			return fmt.Errorf("limit must be an integer: %w", err)
-		}
-		c.Limit = n
+		return setLimit(c, value)
 	case "cache_ttl":
-		if _, err := time.ParseDuration(value); err != nil {
-			return fmt.Errorf("cache_ttl must be a duration (e.g. 1h, 30m): %w", err)
-		}
-		c.CacheTTL = value
+		return setCacheTTL(c, value)
 	case "browser":
 		c.Browser = value
 	case "code_backend":
@@ -139,15 +148,40 @@ func runConfigSet(_ *cobra.Command, args []string) error {
 		c.SourcegraphURL = value
 	case "github_token":
 		c.GithubToken = value
+	case "url_rewrites":
+		return setURLRewrites(c, value)
 	default:
-		return fmt.Errorf("unknown key: %s (valid: backend, searxng_url, brave_api_key, limit, cache_ttl, browser, code_backend, docs_backend, context7_api_key, sourcegraph_url, github_token)", key)
+		return fmt.Errorf("unknown key: %s (valid: backend, searxng_url, brave_api_key, limit, cache_ttl, browser, code_backend, docs_backend, context7_api_key, sourcegraph_url, github_token, url_rewrites)", key)
 	}
+	return nil
+}
 
-	if err := config.Save(c); err != nil {
+func setLimit(c *config.Config, value string) error {
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		return fmt.Errorf("limit must be an integer: %w", err)
+	}
+	c.Limit = n
+	return nil
+}
+
+func setCacheTTL(c *config.Config, value string) error {
+	if _, err := time.ParseDuration(value); err != nil {
+		return fmt.Errorf("cache_ttl must be a duration (e.g. 1h, 30m): %w", err)
+	}
+	c.CacheTTL = value
+	return nil
+}
+
+func setURLRewrites(c *config.Config, value string) error {
+	var rules []urlrewrite.Rule
+	if err := json.Unmarshal([]byte(value), &rules); err != nil {
+		return fmt.Errorf("url_rewrites must be a JSON array of {match, replace}: %w", err)
+	}
+	if _, err := urlrewrite.NewRewriter(rules); err != nil {
 		return err
 	}
-
-	fmt.Fprintf(os.Stderr, "set %s = %s\n", key, value)
+	c.URLRewrites = rules
 	return nil
 }
 
