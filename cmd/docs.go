@@ -15,7 +15,7 @@ var docsCmd = &cobra.Command{
 	Use:   "docs <query>",
 	Short: "Search library documentation",
 	Long:  `Search library documentation using Context7 or a local FTS5 backend. Supports direct library ID lookup and library name resolution.`,
-	Args:  cobra.MinimumNArgs(1),
+	Args:  exitArgs(cobra.MinimumNArgs(1)),
 	RunE:  runDocs,
 }
 
@@ -54,7 +54,7 @@ func runDocs(cmd *cobra.Command, args []string) error {
 
 	results, err := searcher.Search(cmd.Context(), query, limit)
 	if err != nil {
-		return fmt.Errorf("docs search failed: %w", err)
+		return exitErrf(ExitUpstream, "docs search failed: %w", err)
 	}
 
 	if asJSON {
@@ -67,13 +67,13 @@ func runDocs(cmd *cobra.Command, args []string) error {
 
 func runDocsResolve(cmd *cobra.Command, query string, asJSON bool) error {
 	if cfg.Context7APIKey == "" {
-		return fmt.Errorf("context7: API key not set (get one then: ketch config set context7_api_key <key>)")
+		return exitErrf(ExitPrecondition, "context7: API key not set (get one then: ketch config set context7_api_key <key>)")
 	}
 
 	c7 := docs.NewContext7(cfg.Context7APIKey)
 	matches, err := c7.ResolveLibrary(cmd.Context(), query)
 	if err != nil {
-		return fmt.Errorf("resolve failed: %w", err)
+		return exitErrf(ExitUpstream, "resolve failed: %w", err)
 	}
 
 	if asJSON {
@@ -88,13 +88,13 @@ func runDocsResolve(cmd *cobra.Command, query string, asJSON bool) error {
 
 func runDocsWithLibrary(cmd *cobra.Command, query, library string, tokens int, asJSON bool, minimal bool) error {
 	if cfg.Context7APIKey == "" {
-		return fmt.Errorf("context7: API key not set (get one then: ketch config set context7_api_key <key>)")
+		return exitErrf(ExitPrecondition, "context7: API key not set (get one then: ketch config set context7_api_key <key>)")
 	}
 
 	c7 := docs.NewContext7(cfg.Context7APIKey)
 	results, err := c7.GetDocs(cmd.Context(), library, query, tokens)
 	if err != nil {
-		return fmt.Errorf("docs fetch failed: %w", err)
+		return exitErrf(ExitUpstream, "docs fetch failed: %w", err)
 	}
 
 	if asJSON {
@@ -140,12 +140,12 @@ func newDocSearcher(backend string) (docs.Searcher, error) {
 	switch backend {
 	case "context7":
 		if cfg.Context7APIKey == "" {
-			return nil, fmt.Errorf("context7: API key not set (get one then: ketch config set context7_api_key <key>)")
+			return nil, exitErrf(ExitPrecondition, "context7: API key not set (get one then: ketch config set context7_api_key <key>)")
 		}
 		return docs.NewContext7(cfg.Context7APIKey), nil
 	case "local":
 		return docs.NewFTS5Local(), nil
 	default:
-		return nil, fmt.Errorf("unknown docs backend: %s", backend)
+		return nil, exitErrf(ExitValidation, "unknown docs backend: %s", backend)
 	}
 }

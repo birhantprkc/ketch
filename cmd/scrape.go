@@ -90,20 +90,20 @@ func resolveURLs(args []string) ([]string, error) {
 		if strings.HasPrefix(strings.TrimSpace(arg), "[") {
 			var urls []string
 			if err := json.Unmarshal([]byte(arg), &urls); err != nil {
-				return nil, fmt.Errorf("failed to parse JSON array: %w", err)
+				return nil, exitErrf(ExitValidation, "failed to parse JSON array: %w", err)
 			}
 			if len(urls) == 0 {
-				return nil, fmt.Errorf("JSON array is empty")
+				return nil, exitErrf(ExitValidation, "JSON array is empty")
 			}
 			return urls, nil
 		}
 		if _, err := os.Stat(arg); err == nil {
 			urls, err := readLinesFromFile(arg)
 			if err != nil {
-				return nil, err
+				return nil, exitErrf(ExitValidation, "%w", err)
 			}
 			if len(urls) == 0 {
-				return nil, fmt.Errorf("file %q contains no URLs", arg)
+				return nil, exitErrf(ExitValidation, "file %q contains no URLs", arg)
 			}
 			return urls, nil
 		}
@@ -118,7 +118,7 @@ func resolveURLs(args []string) ([]string, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("provide a URL, file path, JSON array, or pipe URLs via stdin")
+	return nil, exitErrf(ExitValidation, "provide a URL, file path, JSON array, or pipe URLs via stdin")
 }
 
 // stdinIsPipe returns true when stdin is a pipe (not a terminal).
@@ -159,7 +159,7 @@ func readLinesFromFile(path string) ([]string, error) {
 func newScraper() (*scrape.Scraper, error) {
 	rw, err := urlrewrite.NewRewriter(cfg.URLRewrites)
 	if err != nil {
-		return nil, fmt.Errorf("invalid url_rewrites: %w", err)
+		return nil, exitErrf(ExitPrecondition, "invalid url_rewrites: %w", err)
 	}
 	return scrape.NewWithRewriter(cfg.Browser, rw), nil
 }
@@ -218,7 +218,7 @@ func scrapeSingle(ctx context.Context, s *scrape.Scraper, pc *cache.Cache, rawUR
 
 	page, err := cachedScrape(ctx, s, pc, rawURL)
 	if err != nil {
-		return fmt.Errorf("scrape failed: %w", err)
+		return exitErrf(ExitUpstream, "scrape failed: %w", err)
 	}
 
 	page.Markdown = postProcess(page.Markdown, trim, maxChars)
@@ -301,15 +301,15 @@ func scrapeOneURL(ctx context.Context, s *scrape.Scraper, pc *cache.Cache, rawUR
 func scrapeURLWithSelector(ctx context.Context, s *scrape.Scraper, rawURL, selector string) (*scrape.Page, error) {
 	html, err := s.Fetch(ctx, rawURL)
 	if err != nil {
-		return nil, fmt.Errorf("fetch failed: %w", err)
+		return nil, exitErrf(ExitUpstream, "fetch failed: %w", err)
 	}
 	html, _ = s.MaybeBrowserFetch(ctx, rawURL, html)
 	markdown, err := extract.ExtractSelector(html, selector)
 	if err != nil {
-		return nil, fmt.Errorf("selector extraction failed: %w", err)
+		return nil, exitErrf(ExitValidation, "selector extraction failed: %w", err)
 	}
 	if markdown == "" {
-		return nil, fmt.Errorf("no elements matched selector %q", selector)
+		return nil, exitErrf(ExitNotFound, "no elements matched selector %q", selector)
 	}
 	title := extract.Title(html)
 	return &scrape.Page{URL: rawURL, Title: title, Markdown: markdown}, nil

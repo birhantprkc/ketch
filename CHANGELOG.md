@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Differentiated exit codes. Scripts and agents can now distinguish failure classes instead of treating every non-zero return as the same: `2` validation/bad input (missing arg, unknown backend, unknown config key, unparseable value), `3` not found (`crawl status <missing-id>`, `crawl stop <missing-id>`, `--select` with no matches), `4` upstream/network (scrape/search/code/docs/crawl fetch failures), `5` precondition (brave/context7 API key missing, github token missing, `config init` when file exists, `crawl stop` on a non-running crawl), `6` cancelled (SIGINT/SIGTERM during any operation, including crawls that previously swallowed cancellation as exit 0). Unwrapped errors continue to exit `1`. Implementation: small `cmd.ExitError` type wrapped via `cmd/exit.go` helpers (`exitErrf`, `exitArgs`); `main.go` maps it to `os.Exit`.
+
 ### Changed
+- `ketch crawl` no longer swallows Ctrl+C as exit 0. SIGINT during a foreground crawl now exits `6` while still printing the summary of what was collected before shutdown. Background crawls (`crawl --background`) are unaffected — they continue to record "stopped" status.
 - `-b/--backend` is no longer a persistent root flag. It now lives on `search` only (matching the existing `code` and `docs` local flags). User impact is negligible because cobra still resolves `-b` against the matching subcommand: `ketch -b ddg search "q"` and `ketch search -b ddg "q"` both continue to work via `search`'s local flag. The pre-cleanup behavior — where `-b` appeared (inert) in the `--help` of `scrape`, `crawl`, `cache`, `browser`, and `config` and rendered a per-machine default reflecting the user's config rather than the source default — is gone. Now: `ketch --help` lists only `--json`; each search-style command (`search`, `code`, `docs`) advertises its own `-b/--backend` with its own backend enum.
 
 ## [0.9.1] - 2026-05-22

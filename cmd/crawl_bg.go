@@ -16,14 +16,14 @@ import (
 var crawlStatusCmd = &cobra.Command{
 	Use:   "status [id]",
 	Short: "Show background crawl status",
-	Args:  cobra.MaximumNArgs(1),
+	Args:  exitArgs(cobra.MaximumNArgs(1)),
 	RunE:  runCrawlStatusCmd,
 }
 
 var crawlStopCmd = &cobra.Command{
 	Use:   "stop <id>",
 	Short: "Stop a running background crawl",
-	Args:  cobra.ExactArgs(1),
+	Args:  exitArgs(cobra.ExactArgs(1)),
 	RunE:  runCrawlStopCmd,
 }
 
@@ -174,7 +174,7 @@ func runCrawlStatusCmd(cmd *cobra.Command, args []string) error {
 func showCrawlStatus(id string, asJSON bool) error {
 	status, err := crawl.ReadStatus(id)
 	if err != nil {
-		return fmt.Errorf("crawl %s not found: %w", id, err)
+		return exitErrf(ExitNotFound, "crawl %s not found: %w", id, err)
 	}
 
 	if asJSON {
@@ -224,18 +224,18 @@ func runCrawlStopCmd(cmd *cobra.Command, args []string) error {
 	id := args[0]
 	status, err := crawl.ReadStatus(id)
 	if err != nil {
-		return fmt.Errorf("crawl %s not found: %w", id, err)
+		return exitErrf(ExitNotFound, "crawl %s not found: %w", id, err)
 	}
 	if status.Status != "running" {
-		return fmt.Errorf("crawl %s is not running (status: %s)", id, status.Status)
+		return exitErrf(ExitPrecondition, "crawl %s is not running (status: %s)", id, status.Status)
 	}
 
 	proc, err := os.FindProcess(status.PID)
 	if err != nil {
-		return fmt.Errorf("process %d not found: %w", status.PID, err)
+		return exitErrf(ExitNotFound, "process %d not found: %w", status.PID, err)
 	}
 	if err := sendStop(proc); err != nil {
-		return fmt.Errorf("failed to stop crawl: %w", err)
+		return exitErrf(ExitUpstream, "failed to stop crawl: %w", err)
 	}
 
 	fmt.Fprintf(os.Stderr, "Sent stop signal to crawl %s (pid %d)\n", id, status.PID)

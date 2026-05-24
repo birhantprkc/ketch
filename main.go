@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/signal"
 	"syscall"
@@ -17,7 +18,20 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	if err := cmd.ExecuteContext(ctx); err != nil {
-		os.Exit(1)
+	err := cmd.ExecuteContext(ctx)
+	if err == nil {
+		return
 	}
+
+	// Translate classified errors to documented exit codes (see cmd/exit.go).
+	// Cancellation is checked first so a SIGINT that propagated through any
+	// error path still exits 6 regardless of how it was wrapped.
+	if errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
+		os.Exit(cmd.ExitCancelled)
+	}
+	var exitErr *cmd.ExitError
+	if errors.As(err, &exitErr) {
+		os.Exit(exitErr.Code)
+	}
+	os.Exit(1)
 }

@@ -46,7 +46,7 @@ var configInitCmd = &cobra.Command{
 var configSetCmd = &cobra.Command{
 	Use:   "set <key> <value>",
 	Short: "Set a config value",
-	Args:  cobra.ExactArgs(2),
+	Args:  exitArgs(cobra.ExactArgs(2)),
 	RunE:  runConfigSet,
 }
 
@@ -97,7 +97,7 @@ func runConfigInit(_ *cobra.Command, _ []string) error {
 	}
 
 	if _, err := os.Stat(path); err == nil {
-		return fmt.Errorf("config already exists: %s", path)
+		return exitErrf(ExitPrecondition, "config already exists: %s", path)
 	}
 
 	if err := config.Save(config.Defaults()); err != nil {
@@ -151,7 +151,7 @@ func applyConfigSet(c *config.Config, key, value string) error {
 	case "url_rewrites":
 		return setURLRewrites(c, value)
 	default:
-		return fmt.Errorf("unknown key: %s (valid: backend, searxng_url, brave_api_key, limit, cache_ttl, browser, code_backend, docs_backend, context7_api_key, sourcegraph_url, github_token, url_rewrites)", key)
+		return exitErrf(ExitValidation, "unknown key: %s (valid: backend, searxng_url, brave_api_key, limit, cache_ttl, browser, code_backend, docs_backend, context7_api_key, sourcegraph_url, github_token, url_rewrites)", key)
 	}
 	return nil
 }
@@ -159,7 +159,7 @@ func applyConfigSet(c *config.Config, key, value string) error {
 func setLimit(c *config.Config, value string) error {
 	n, err := strconv.Atoi(value)
 	if err != nil {
-		return fmt.Errorf("limit must be an integer: %w", err)
+		return exitErrf(ExitValidation, "limit must be an integer: %w", err)
 	}
 	c.Limit = n
 	return nil
@@ -167,7 +167,7 @@ func setLimit(c *config.Config, value string) error {
 
 func setCacheTTL(c *config.Config, value string) error {
 	if _, err := time.ParseDuration(value); err != nil {
-		return fmt.Errorf("cache_ttl must be a duration (e.g. 1h, 30m): %w", err)
+		return exitErrf(ExitValidation, "cache_ttl must be a duration (e.g. 1h, 30m): %w", err)
 	}
 	c.CacheTTL = value
 	return nil
@@ -176,10 +176,10 @@ func setCacheTTL(c *config.Config, value string) error {
 func setURLRewrites(c *config.Config, value string) error {
 	var rules []urlrewrite.Rule
 	if err := json.Unmarshal([]byte(value), &rules); err != nil {
-		return fmt.Errorf("url_rewrites must be a JSON array of {match, replace}: %w", err)
+		return exitErrf(ExitValidation, "url_rewrites must be a JSON array of {match, replace}: %w", err)
 	}
 	if _, err := urlrewrite.NewRewriter(rules); err != nil {
-		return err
+		return exitErrf(ExitValidation, "%w", err)
 	}
 	c.URLRewrites = rules
 	return nil

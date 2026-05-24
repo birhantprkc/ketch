@@ -15,7 +15,7 @@ var codeCmd = &cobra.Command{
 	Use:   "code <query>",
 	Short: "Search code across open-source repositories",
 	Long:  `Search code using Sourcegraph (default) or GitHub Code Search. Supports language filtering and per-backend query qualifiers.`,
-	Args:  cobra.MinimumNArgs(1),
+	Args:  exitArgs(cobra.MinimumNArgs(1)),
 	RunE:  runCode,
 }
 
@@ -42,7 +42,7 @@ func runCode(cmd *cobra.Command, args []string) error {
 
 	results, err := searcher.Search(cmd.Context(), query, lang, limit)
 	if err != nil {
-		return fmt.Errorf("code search failed: %w", err)
+		return exitErrf(ExitUpstream, "code search failed: %w", err)
 	}
 
 	if asJSON {
@@ -90,7 +90,7 @@ func newCodeSearcher(backend string) (code.Searcher, error) {
 	case "github":
 		token, source := cfg.ResolveGithubToken()
 		if token == "" {
-			return nil, fmt.Errorf(`github code search: no token found.
+			return nil, exitErrf(ExitPrecondition, `github code search: no token found.
   - explicit:   ketch config set github_token <token>
   - env var:    export GITHUB_TOKEN=<token>
   - or run:     gh auth login`)
@@ -98,6 +98,6 @@ func newCodeSearcher(backend string) (code.Searcher, error) {
 		_ = source
 		return code.NewGitHub(token), nil
 	default:
-		return nil, fmt.Errorf("unknown code backend: %s", backend)
+		return nil, exitErrf(ExitValidation, "unknown code backend: %s", backend)
 	}
 }

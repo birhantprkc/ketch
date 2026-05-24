@@ -18,7 +18,7 @@ var searchCmd = &cobra.Command{
 	Use:   "search <query>",
 	Short: "Search the web and return results",
 	Long:  `Search the web using Brave (default), DuckDuckGo, or SearXNG. Add --scrape to fetch and extract full content from results.`,
-	Args:  cobra.MinimumNArgs(1),
+	Args:  exitArgs(cobra.MinimumNArgs(1)),
 	RunE:  runSearch,
 }
 
@@ -51,7 +51,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 
 	results, err := searcher.Search(cmd.Context(), query, limit)
 	if err != nil {
-		return fmt.Errorf("search failed: %w", err)
+		return exitErrf(ExitUpstream, "search failed: %w", err)
 	}
 
 	if doScrape {
@@ -151,7 +151,7 @@ func newSearcher(cmd *cobra.Command, backend string) (search.Searcher, error) {
 	switch backend {
 	case "brave":
 		if cfg.BraveAPIKey == "" {
-			return nil, fmt.Errorf("brave: API key not set (get one free at https://brave.com/search/api/ then: ketch config set brave_api_key <key>)")
+			return nil, exitErrf(ExitPrecondition, "brave: API key not set (get one free at https://brave.com/search/api/ then: ketch config set brave_api_key <key>)")
 		}
 		return search.NewBrave(cfg.BraveAPIKey), nil
 	case "searxng":
@@ -160,6 +160,6 @@ func newSearcher(cmd *cobra.Command, backend string) (search.Searcher, error) {
 	case "ddg":
 		return search.NewDDG(), nil
 	default:
-		return nil, fmt.Errorf("unknown backend: %s", backend)
+		return nil, exitErrf(ExitValidation, "unknown backend: %s", backend)
 	}
 }

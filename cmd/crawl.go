@@ -19,7 +19,7 @@ var crawlCmd = &cobra.Command{
 	Use:   "crawl <url>",
 	Short: "Crawl a site and extract pages",
 	Long:  `BFS crawl from a seed URL, extracting clean markdown from each discovered page. Streams results as they are found.`,
-	Args:  cobra.ExactArgs(1),
+	Args:  exitArgs(cobra.ExactArgs(1)),
 	RunE:  runCrawl,
 }
 
@@ -122,13 +122,16 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	duration := time.Since(start)
 	printCrawlSummary(seed, count, newCount, changed, unchanged, errCount, duration)
 
-	// Ctrl+C is a deliberate user action, not a crawl failure. The summary
-	// above already reports what was collected before shutdown.
+	// Surface SIGINT/SIGTERM as exit 6 (cancelled) instead of swallowing it as
+	// exit 0; scripts need to distinguish "crawl finished" from "user stopped
+	// it mid-way". The summary printed above still reports what was collected
+	// before shutdown. main.go's errors.Is(context.Canceled) check maps this
+	// to ExitCancelled without us needing to wrap it.
 	if err != nil && errors.Is(err, context.Canceled) {
-		return nil
+		return err
 	}
 	if err != nil {
-		return fmt.Errorf("crawl failed: %w", err)
+		return exitErrf(ExitUpstream, "crawl failed: %w", err)
 	}
 	return nil
 }
