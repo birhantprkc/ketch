@@ -7,7 +7,7 @@ Fast, stateless CLI for agentic web search and scrape.
 ```
 main.go                      Thin entry point → cmd.Execute()
 cmd/
-  root.go                    Cobra root, global flags (--json, --backend)
+  root.go                    Cobra root, global flag (--json)
   search.go                  Search command: query → results, optional --scrape
   scrape.go                  Scrape command: URLs → markdown, concurrent batch
   crawl.go                   Crawl command: BFS/sitemap crawl with streaming output
@@ -84,7 +84,7 @@ ketch cache                                 # show cache stats
 | Flag | Scope | Default | Description |
 |------|-------|---------|-------------|
 | --json | global | false | JSON output |
-| --backend, -b | global | brave | Search backend |
+| --backend, -b | search | brave | Search backend (brave/ddg/searxng) |
 | --limit, -l | search | 5 | Max results |
 | --scrape | search | false | Fetch full content |
 | --searxng-url | search | http://localhost:8081 | SearXNG URL |
@@ -96,7 +96,8 @@ ketch cache                                 # show cache stats
 | --background | crawl | false | Run in background |
 | --allow | crawl | — | Path substring filters |
 | --deny | crawl | — | Regex deny patterns |
-| --backend, -b | code, docs | cfg value | Code/docs backend |
+| --backend, -b | code | sourcegraph | Code backend (sourcegraph/github) |
+| --backend, -b | docs | context7 | Docs backend (context7/local) |
 | --lang | code | — | Language qualifier (appended to query) |
 | --library | docs | — | Context7 library ID, skips resolve |
 | --tokens | docs | 4000 | Context7 token budget |

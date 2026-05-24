@@ -9,6 +9,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Anvil · target: cmd/ · kind: cli · boundary: tool
+// callers: agent,script,human-operator · risk: R0+R1 (root -b dropped; search -b added)
+// contracts: see CHANGELOG.md · obligations: json,version,help
+
 var cfg = config.Load()
 
 var rootCmd = &cobra.Command{
@@ -38,8 +42,10 @@ func ExecuteContext(ctx context.Context) error {
 
 func init() {
 	rootCmd.PersistentFlags().Bool("json", false, "output as JSON")
-	rootCmd.PersistentFlags().StringP("backend", "b", cfg.Backend,
-		fmt.Sprintf("search backend: %s", strings.Join(config.AvailableBackends(), ", ")))
+	// `--backend` is owned by each search-style subcommand (search, code, docs)
+	// rather than the root so non-search subcommands (scrape, crawl, cache,
+	// browser, config) don't advertise an inert global flag, and so the three
+	// independent backend universes never collide on one persistent `-b`.
 }
 
 func runRoot(cmd *cobra.Command, _ []string) error {

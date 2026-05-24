@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/1broseidon/ketch/cache"
+	"github.com/1broseidon/ketch/config"
 	"github.com/1broseidon/ketch/scrape"
 	"github.com/1broseidon/ketch/search"
 	"github.com/spf13/cobra"
@@ -23,6 +24,8 @@ var searchCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(searchCmd)
+	searchCmd.Flags().StringP("backend", "b", cfg.Backend,
+		"search backend: "+strings.Join(config.AvailableBackends(), ", "))
 	searchCmd.Flags().IntP("limit", "l", cfg.Limit, "max number of results")
 	searchCmd.Flags().Bool("scrape", false, "scrape full content from each result")
 	searchCmd.Flags().String("searxng-url", cfg.SearxngURL, "SearXNG instance URL")
@@ -36,7 +39,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	limit, _ := cmd.Flags().GetInt("limit")
 	doScrape, _ := cmd.Flags().GetBool("scrape")
 	asJSON, _ := cmd.Root().PersistentFlags().GetBool("json")
-	backend, _ := cmd.Root().PersistentFlags().GetString("backend")
+	backend, _ := cmd.Flags().GetString("backend")
 	maxChars, _ := cmd.Flags().GetInt("max-chars")
 	trim, _ := cmd.Flags().GetBool("trim")
 	minimal, _ := cmd.Flags().GetBool("minimal")
