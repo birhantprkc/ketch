@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.2] - 2026-05-24
 
 ### Added
 - Differentiated exit codes. Scripts and agents can now distinguish failure classes instead of treating every non-zero return as the same: `2` validation/bad input (missing arg, unknown backend, unknown config key, unparseable value), `3` not found (`crawl status <missing-id>`, `crawl stop <missing-id>`, `--select` with no matches), `4` upstream/network (scrape/search/code/docs/crawl fetch failures), `5` precondition (brave/context7 API key missing, github token missing, `config init` when file exists, `crawl stop` on a non-running crawl), `6` cancelled (SIGINT/SIGTERM during any operation, including crawls that previously swallowed cancellation as exit 0). Unwrapped errors continue to exit `1`. Implementation: small `cmd.ExitError` type wrapped via `cmd/exit.go` helpers (`exitErrf`, `exitArgs`); `main.go` maps it to `os.Exit`.
