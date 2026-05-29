@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.3] - 2026-05-29
+
+### Added
+- `grepapp` code search backend (Grep MCP, `mcp.grep.app`) — keyless, JSON-RPC over SSE, literal/regex search across 1M+ public GitHub repos. It is now the default for `ketch code` (was `sourcegraph`).
+- `ketch code --regex` interprets the query as a regular expression. Supported on `grepapp` (sets `useRegexp` on the MCP `searchGitHub` tool) and `sourcegraph` (appends `patterntype:regexp`); `github` rejects it with a clean `ExitPrecondition` error because REST code search is literal-only.
+
+### Changed
+- `code.Searcher` interface refactored from positional params to a `Query` struct so backend options can grow without signature churn.
+
+### Fixed
+- Documentation drift across README, CLAUDE.md, and the site reference. Corrected the `ketch code` default backend (`grepapp`, not `sourcegraph`), scoped `-b/--backend` to `search`/`code`/`docs` (it is not a global flag), documented the previously-missing flags (`--minimal`, `--trim`, `--max-chars`, `--select`, `--no-llms-txt`, scrape `--concurrency`, `--regex`, `--searxng-url`) and the `version` command, added code/docs backend sections to the site reference, synced the `ketch config` discovery JSON example with real output, and dropped completed "What's Next" items (`--raw` is implemented; unit tests exist).
+
 ## [0.9.2] - 2026-05-24
 
 ### Added
