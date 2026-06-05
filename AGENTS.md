@@ -19,7 +19,7 @@ cmd/
   browser.go                 Browser command: install, status
   proc_unix.go               Unix process management (detach, signals)
   proc_windows.go            Windows process management stub
-search/                      Searcher interface + Brave/DDG/SearXNG backends
+search/                      Searcher interface + Brave/DDG/SearXNG/EXA backends
 code/                        code.Searcher interface + Sourcegraph/GitHub backends
 docs/                        docs.Searcher interface + Context7/FTS5 backends
 scrape/                      HTTP fetch + Page type, JS detection fallback, Rod browser
@@ -58,6 +58,7 @@ Reusable packages live at the module root so external programs can `import "gith
 ketch search "query"                        # search, return results
 ketch search "query" --scrape               # search + fetch full content
 ketch search "query" -b searxng             # use SearXNG backend
+ketch search "query" -b exa                 # use Exa hosted MCP backend
 ketch scrape <url>                          # single URL → markdown
 ketch scrape <url1> <url2> <url3>           # concurrent batch scrape
 ketch scrape urls.txt                       # file with one URL per line
@@ -84,7 +85,7 @@ ketch cache                                 # show cache stats
 | Flag | Scope | Default | Description |
 |------|-------|---------|-------------|
 | --json | global | false | JSON output |
-| --backend, -b | search | brave | Search backend (brave/ddg/searxng) |
+| --backend, -b | search | brave | Search backend (brave/ddg/searxng/exa) |
 | --limit, -l | search | 5 | Max results |
 | --scrape | search | false | Fetch full content |
 | --searxng-url | search | http://localhost:8081 | SearXNG URL |

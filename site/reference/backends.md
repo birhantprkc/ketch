@@ -4,7 +4,7 @@ ketch has three search surfaces, each with its own backends: web search (`ketch 
 
 ## Web Search Backends
 
-ketch supports three web-search backends. Set the default with `ketch config set backend <name>`.
+ketch supports four web-search backends. Set the default with `ketch config set backend <name>`.
 
 ## Brave (default)
 
@@ -47,6 +47,19 @@ ketch config set searxng_url http://localhost:8081
 ```
 
 **Recommended for:** operators running agents that search frequently, or anyone who wants full control over their search infrastructure.
+
+## Exa
+
+AI-oriented web search via Exa's hosted MCP endpoint. It works without configuration by default, with an optional Exa API key for authenticated usage.
+
+**Setup:** None for hosted MCP. Optional key:
+
+```sh
+ketch config set exa_api_key <your-key>
+ketch config set backend exa
+```
+
+**Recommended for:** agent workflows that benefit from Exa's clean result snippets and content-oriented search output.
 
 ## Code Search Backends
 

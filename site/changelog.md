@@ -2,6 +2,12 @@
 
 This page mirrors the canonical [`CHANGELOG.md`](https://github.com/1broseidon/ketch/blob/main/CHANGELOG.md) in the repo root. Versions follow [Semantic Versioning](https://semver.org/) and match the published git tags.
 
+## Unreleased
+
+**Added**
+
+- `exa` web search backend via Exa's hosted MCP endpoint, with optional `exa_api_key` config for authenticated usage.
+
 ## v0.9.3 — 2026-05-29
 
 **Added**

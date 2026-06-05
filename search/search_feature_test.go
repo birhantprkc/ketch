@@ -2,9 +2,11 @@ package search
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -282,6 +284,152 @@ func TestFeatureSearXNGServerError(t *testing.T) {
 	_, err := s.Search(context.Background(), "test", 5)
 	if err == nil {
 		t.Fatal("expected error for 500 response")
+	}
+}
+
+func TestFeatureEXASearchParses(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, `event: message
+`)
+		fmt.Fprint(w, `data: {"result":{"content":[{"type":"text","text":"Title: Rust Programming Language\nURL: https://www.rust-lang.org/\nHighlights:\nRust is a programming language.\n\n---\n\nTitle: Rust Releases\nURL: https://blog.rust-lang.org/\nHighlights:\nRelease notes for Rust."}]}}
+`)
+	}))
+	defer server.Close()
+
+	e := &EXA{client: &http.Client{Transport: &rewriteTransport{base: http.DefaultTransport, target: server.URL}}}
+	results, err := e.Search(context.Background(), "rust", 5)
+	if err != nil {
+		t.Fatalf("Search error: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("got %d results, want 2", len(results))
+	}
+	if results[0].Title != "Rust Programming Language" {
+		t.Errorf("title = %q, want %q", results[0].Title, "Rust Programming Language")
+	}
+	if results[0].URL != "https://www.rust-lang.org/" {
+		t.Errorf("url = %q, want %q", results[0].URL, "https://www.rust-lang.org/")
+	}
+	if results[0].Description != "Rust is a programming language." {
+		t.Errorf("description = %q, want %q", results[0].Description, "Rust is a programming language.")
+	}
+	if !strings.Contains(results[0].Content, "Rust is a programming language.") {
+		t.Errorf("content = %q, want rust highlight", results[0].Content)
+	}
+}
+
+func TestFeatureEXALimitRespected(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, `event: message
+`)
+		fmt.Fprint(w, `data: {"result":{"content":[{"type":"text","text":"Title: A\nURL: https://a.com\nHighlights:\na\n\n---\n\nTitle: B\nURL: https://b.com\nHighlights:\nb\n\n---\n\nTitle: C\nURL: https://c.com\nHighlights:\nc"}]}}
+`)
+	}))
+	defer server.Close()
+
+	e := &EXA{client: &http.Client{Transport: &rewriteTransport{base: http.DefaultTransport, target: server.URL}}}
+	results, err := e.Search(context.Background(), "rust", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 2 {
+		t.Errorf("got %d results, want 2 (limit)", len(results))
+	}
+}
+
+func TestFeatureEXAEmptyResults(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, `event: message
+`)
+		fmt.Fprint(w, `data: {"result":{"content":[{"type":"text","text":""}]}}
+`)
+	}))
+	defer server.Close()
+
+	e := &EXA{client: &http.Client{Transport: &rewriteTransport{base: http.DefaultTransport, target: server.URL}}}
+	results, err := e.Search(context.Background(), "nothing", 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 0 {
+		t.Errorf("expected empty results, got %d", len(results))
+	}
+}
+
+func TestFeatureEXAServerError(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	e := &EXA{client: &http.Client{Transport: &rewriteTransport{base: http.DefaultTransport, target: server.URL}}}
+	_, err := e.Search(context.Background(), "test", 5)
+	if err == nil {
+		t.Fatal("expected error for 500 response")
+	}
+}
+
+func TestFeatureEXARequestShape(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		params := body["params"].(map[string]any)
+		arguments := params["arguments"].(map[string]any)
+		if body["method"] != "tools/call" {
+			t.Errorf("method = %q, want tools/call", body["method"])
+		}
+		if params["name"] != "web_search_exa" {
+			t.Errorf("tool name = %q, want web_search_exa", params["name"])
+		}
+		if arguments["query"] != "rust release date" {
+			t.Errorf("query = %q, want rust release date", arguments["query"])
+		}
+		if arguments["numResults"] != float64(5) {
+			t.Errorf("numResults = %v, want 5", arguments["numResults"])
+		}
+		if arguments["livecrawl"] != "fallback" {
+			t.Errorf("livecrawl = %q, want fallback", arguments["livecrawl"])
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, `data: {"result":{"content":[{"type":"text","text":"Title: Rust\nURL: https://www.rust-lang.org/\nHighlights:\nRust"}]}}
+`)
+	}))
+	defer server.Close()
+
+	e := &EXA{client: &http.Client{Transport: &rewriteTransport{base: http.DefaultTransport, target: server.URL}}}
+	_, err := e.Search(context.Background(), "rust release date", 5)
+	if err != nil {
+		t.Fatalf("Search error: %v", err)
+	}
+}
+
+func TestFeatureEXAAPIKeyAdded(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("exaApiKey"); got != "test-key" {
+			t.Errorf("exaApiKey = %q, want test-key", got)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, `data: {"result":{"content":[{"type":"text","text":"Title: Rust\nURL: https://www.rust-lang.org/\nHighlights:\nRust"}]}}
+`)
+	}))
+	defer server.Close()
+
+	key := "test-key"
+	e := &EXA{apiKey: &key, client: &http.Client{Transport: &rewriteTransport{base: http.DefaultTransport, target: server.URL}}}
+	_, err := e.Search(context.Background(), "rust", 5)
+	if err != nil {
+		t.Fatalf("Search error: %v", err)
 	}
 }
 

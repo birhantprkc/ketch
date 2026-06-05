@@ -57,7 +57,7 @@ ketch scrape https://example.com --json
 
 | Command | What it does |
 |---------|-------------|
-| `search` | Web search via Brave, DuckDuckGo, or SearXNG, optional `--scrape` for full content |
+| `search` | Web search via Brave, DuckDuckGo, SearXNG, or Exa, optional `--scrape` for full content |
 | `code` | Code search across OSS via Grep (default), Sourcegraph, or GitHub Code Search |
 | `docs` | Library/framework docs via Context7 (curated, version-aware snippets) |
 | `scrape` | Fetch URLs and extract clean markdown, concurrent batch support |
@@ -204,7 +204,7 @@ ketch config
   "docs_backend": "context7",
   "sourcegraph_url": "https://sourcegraph.com",
   "github_token_source": "gh-cli",
-  "available_backends": ["brave", "ddg", "searxng"],
+  "available_backends": ["brave", "ddg", "searxng", "exa"],
   "available_code_backends": ["grepapp", "sourcegraph", "github"],
   "available_doc_backends": ["context7", "local"]
 }
@@ -217,6 +217,7 @@ ketch config
 | `brave` (default) | Free API key from brave.com/search/api | Stable JSON API |
 | `ddg` | Zero config | Rate-limited by DDG currently |
 | `searxng` | Self-hosted instance | Most reliable for heavy use |
+| `exa` | Zero config via hosted MCP; optional `ketch config set exa_api_key <key>` | AI-oriented search with snippets/content from Exa |
 
 ### Code Backends (ketch code)
 
@@ -277,7 +278,7 @@ Use `ketch` CLI for all external research — web pages, OSS code, library docs.
 
 ### Why this works
 
-An agent calling a web search API typically needs to know which provider to use, manage API keys, and handle provider-specific response formats. ketch collapses that: the operator runs `ketch config set backend searxng` (or `ketch config set code_backend github`, `ketch config set docs_backend context7`) once, and every agent invocation uses the right backend automatically. The agent's system prompt doesn't mention backends at all — it just says "use ketch."
+An agent calling a web search API typically needs to know which provider to use, manage API keys, and handle provider-specific response formats. ketch collapses that: the operator runs `ketch config set backend exa` (or `ketch config set code_backend github`, `ketch config set docs_backend context7`) once, and every agent invocation uses the right backend automatically. The agent's system prompt doesn't mention backends at all — it just says "use ketch."
 
 `ketch config` returns the full discovery payload as JSON — including which search, code, and docs backends are active and which token source is in effect — so an agent that needs to inspect capabilities can do so in one call without parsing help text.
 
