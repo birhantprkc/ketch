@@ -132,6 +132,8 @@ func applyConfigSet(c *config.Config, key, value string) error {
 		c.SearxngURL = value
 	case "brave_api_key":
 		c.BraveAPIKey = value
+	case "exa_api_key":
+		c.ExaAPIKey = value
 	case "limit":
 		return setLimit(c, value)
 	case "cache_ttl":
@@ -151,7 +153,7 @@ func applyConfigSet(c *config.Config, key, value string) error {
 	case "url_rewrites":
 		return setURLRewrites(c, value)
 	default:
-		return exitErrf(ExitValidation, "unknown key: %s (valid: backend, searxng_url, brave_api_key, limit, cache_ttl, browser, code_backend, docs_backend, context7_api_key, sourcegraph_url, github_token, url_rewrites)", key)
+		return exitErrf(ExitValidation, "unknown key: %s (valid: backend, searxng_url, brave_api_key, exa_api_key, limit, cache_ttl, browser, code_backend, docs_backend, context7_api_key, sourcegraph_url, github_token, url_rewrites)", key)
 	}
 	return nil
 }

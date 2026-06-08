@@ -83,7 +83,7 @@ ketch scrape https://help.example.com/s/article/1234
   "docs_backend": "context7",
   "sourcegraph_url": "https://sourcegraph.com",
   "github_token_source": "none",
-  "available_backends": ["brave", "ddg", "searxng"],
+  "available_backends": ["brave", "ddg", "searxng", "exa"],
   "available_code_backends": ["grepapp", "sourcegraph", "github"],
   "available_doc_backends": ["context7", "local"]
 }

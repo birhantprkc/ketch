@@ -17,7 +17,7 @@ import (
 var searchCmd = &cobra.Command{
 	Use:   "search <query>",
 	Short: "Search the web and return results",
-	Long:  `Search the web using Brave (default), DuckDuckGo, or SearXNG. Add --scrape to fetch and extract full content from results.`,
+	Long:  `Search the web using Brave (default), DuckDuckGo, SearXNG, or Exa. Add --scrape to fetch and extract full content from results.`,
 	Args:  exitArgs(cobra.MinimumNArgs(1)),
 	RunE:  runSearch,
 }
@@ -159,6 +159,12 @@ func newSearcher(cmd *cobra.Command, backend string) (search.Searcher, error) {
 		return search.NewSearXNG(url), nil
 	case "ddg":
 		return search.NewDDG(), nil
+	case "exa":
+		var apiKey *string
+		if cfg.ExaAPIKey != "" {
+			apiKey = &cfg.ExaAPIKey
+		}
+		return search.NewEXA(apiKey), nil
 	default:
 		return nil, exitErrf(ExitValidation, "unknown backend: %s", backend)
 	}
