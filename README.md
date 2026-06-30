@@ -1,5 +1,10 @@
 # ketch
 
+[![GitHub Stars](https://img.shields.io/github/stars/1broseidon/ketch?style=social)](https://github.com/1broseidon/ketch/stargazers)
+[![Go Reference](https://pkg.go.dev/badge/github.com/1broseidon/ketch.svg)](https://pkg.go.dev/github.com/1broseidon/ketch)
+[![Go Report Card](https://goreportcard.com/badge/github.com/1broseidon/ketch)](https://goreportcard.com/report/github.com/1broseidon/ketch)
+[![Latest Release](https://img.shields.io/github/v/release/1broseidon/ketch)](https://github.com/1broseidon/ketch/releases/latest)
+
 Fast, stateless CLI for web search, code search, library docs, and scraping. Three search surfaces (web, code, docs), one binary, no daemon. Designed to be called by AI agents or directly from your terminal.
 
 ## Install

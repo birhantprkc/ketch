@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- MIT `LICENSE` file. Resolves pkg.go.dev's "License: None detected" (which had hidden the package docs) and satisfies the awesome-go licensing requirement.
+- README badges: pkg.go.dev (Go Reference) and Go Report Card, plus GitHub stars and latest release.
+- CI workflow (`.github/workflows/ci.yml`) running build, lint (golangci-lint), and test on pushes to `main` and pull requests, with a `make build-check` target (`go build ./...`) for the build job.
+
 ## [0.9.5] - 2026-06-29
 
 ### Fixed

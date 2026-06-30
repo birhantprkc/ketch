@@ -1,9 +1,12 @@
 BINARY := ketch
 
-.PHONY: build clean test lint install
+.PHONY: build build-check clean test lint install
 
 build:
 	go build -o $(BINARY) .
+
+build-check:
+	go build ./...
 
 install:
 	go install .
