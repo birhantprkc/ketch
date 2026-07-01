@@ -20,11 +20,11 @@ cmd/
   mcp.go                     MCP command: `mcp serve` runs the MCP server over stdio
   proc_unix.go               Unix process management (detach, signals)
   proc_windows.go            Windows process management stub
-search/                      Searcher interface + Brave/DDG/SearXNG/EXA backends
-code/                        code.Searcher interface + Sourcegraph/GitHub backends
-docs/                        docs.Searcher interface + Context7/FTS5 backends
-mcp/                         MCP tool adapters (search/code/docs/scrape) over the go-sdk mcp package; same config/backend selection as the CLI
-scrape/                      HTTP fetch + Page type, JS detection fallback, Rod browser
+search/                      Searcher interface + Brave/DDG/SearXNG/EXA backends; NewFromConfig owns the backend switch for cmd/ and mcp/
+code/                        code.Searcher interface + GrepApp/Sourcegraph/GitHub backends; NewFromConfig owns the backend switch
+docs/                        docs.Searcher interface + Context7 backend (FTS5 local is an unimplemented stub); NewFromConfig owns the backend switch
+mcp/                         MCP server (search/code/docs/scrape/crawl tools) over the go-sdk mcp package; Server struct holds the shared scraper + cache, tools call the same NewFromConfig constructors as the CLI
+scrape/                      HTTP fetch + Page type, JS detection fallback, Rod browser; pipeline.go has the cache-aware scrape pipeline (CachedScrape*, ScrapeSelector, FetchLLMSTxt) shared by cmd/ and mcp/
 extract/                     readability + html-to-markdown pipeline, JS shell detection (Detector: built-in + config spa_markers, modern hydration/streaming frameworks)
 crawl/                       BFS crawler, work queue + worker pool, background status
 config/                      JSON config loading/saving (~/.config/ketch/)
@@ -46,6 +46,18 @@ Reusable packages live at the module root so external programs can `import "gith
 - **Three search surfaces**: `ketch search` finds web pages, `ketch code` greps real OSS code, `ketch docs` fetches library documentation. Each has its own backend interface and Result type — they never share backends.
 - **Smart input detection on scrape**: single URL, multiple positional args, JSON array string, file path, or stdin pipe all work — ketch routes automatically. No --batch flag needed.
 - **Context-aware interfaces**: all three Searcher interfaces (`search`, `code`, `docs`) take `context.Context` as first param for cancellation and timeout propagation.
+
+## MCP Server
+
+`ketch mcp serve` runs an MCP (Model Context Protocol) server over stdio, exposing five tools: `search`, `code`, `docs`, `scrape`, and `crawl`. Tool handlers call the same packages as the Cobra commands, through the same config-driven constructors (`search.NewFromConfig` etc.), and resolve backends/API keys from the same `~/.config/ketch/` config — an agent talking MCP sees exactly what a human using the CLI sees.
+
+- **Lifecycle**: the go-sdk dispatches tool calls concurrently, so process-lifetime resources — the headless-browser scraper, the bbolt page-cache handle, the compiled URL rewriter — are constructed once in `mcp.NewServer`, shared by all calls, and released by `Server.Close` when `serve` exits. Never construct these per call.
+- **Option parity**: each tool exposes the per-invocation options of its CLI command (`scrape` gets `selector`/`raw`/`force_browser`/`no_llms_txt`/`trim`/`max_chars`/`no_cache` plus a `urls` batch input; `search` gets `searxng_url` and `scrape`; `crawl` gets `depth`/`sitemap`/`allow`/`deny`/`max_pages`). Config-level settings (API keys, cache TTL, browser binary) stay operator-configured and are never tool params.
+- **Error taxonomy**: every tool error starts with a stable machine-readable prefix mirroring the CLI exit codes — `[validation]` (exit 2), `[not_found]` (3), `[upstream]` (4), `[precondition]` (5), `[cancelled]` (6) — so agents can tell "fix your input" from "retry later". MCP has no structured tool-error field; the prefix is the contract.
+- **Bounded crawl**: the `crawl` tool is synchronous and capped (`max_pages` default 30, hard cap 100, 3-minute wall clock); partial results return with `stopped: "max_pages" | "timeout"`. Detached background crawls (`ketch crawl --background`, status/stop) remain CLI-only.
+- **Annotations**: all tools are read-only network fetchers and declare `readOnlyHint: true` and `openWorldHint: true`.
+- **Security note**: the server performs no URL filtering — `scrape` and `crawl` fetch whatever URL the client supplies, including private or internal addresses reachable from wherever the server runs (their descriptions say so). Run it with the network posture you'd give the agent itself; don't point an untrusted agent at a server inside a sensitive network.
+- **Smoke test**: `go test -tags mcpsmoke ./mcp/... -v` exercises the real binary over stdio (live network; not part of `go test ./...`).
 
 ## Quality Standards
 
@@ -80,7 +92,7 @@ ketch docs "query" --library /org/repo     # skip resolve, fetch directly
 ketch docs --resolve "library name"        # resolve library name → Context7 IDs
 ketch config                                # show effective config + backends
 ketch cache                                 # show cache stats
-ketch mcp serve                             # run as an MCP server over stdio (search/code/docs/scrape tools)
+ketch mcp serve                             # run as an MCP server over stdio (search/code/docs/scrape/crawl tools)
 ```
 
 ## Flags
