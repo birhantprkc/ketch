@@ -2,157 +2,180 @@ package mcp
 
 import (
 	"context"
-	"fmt"
-	"time"
-	"unicode/utf8"
+	"errors"
+	"sync"
 
-	"github.com/1broseidon/ketch/cache"
-	"github.com/1broseidon/ketch/config"
 	"github.com/1broseidon/ketch/extract"
 	"github.com/1broseidon/ketch/scrape"
-	"github.com/1broseidon/ketch/urlrewrite"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// ScrapeInput is the input schema for the "scrape" tool. Phase 1 supports a
-// single URL per call; the CLI's multi-URL/file/stdin input detection is not
-// exposed here.
+// Batch scrapes run a bounded worker pool over the shared scraper/cache.
+const (
+	defaultScrapeConcurrency = 5  // matches the CLI's --concurrency default
+	maxScrapeConcurrency     = 16 // server-side cap
+)
+
+// ScrapeInput is the input schema for the "scrape" tool. Exactly one of url
+// or urls must be provided. The options mirror the per-invocation flags of
+// `ketch scrape`; the CLI's file/stdin input modes don't apply here.
 type ScrapeInput struct {
-	URL      string `json:"url" jsonschema:"the URL to scrape"`
-	Selector string `json:"selector,omitempty" jsonschema:"CSS selector to extract specific elements, skips readability"`
-	Trim     bool   `json:"trim,omitempty" jsonschema:"strip markdown formatting, keep content text only"`
-	MaxChars int    `json:"max_chars,omitempty" jsonschema:"truncate markdown output to N characters (0 = disabled)"`
-	NoCache  bool   `json:"no_cache,omitempty" jsonschema:"bypass the page cache"`
+	URL          string   `json:"url,omitempty" jsonschema:"the URL to scrape (exactly one of url or urls)"`
+	URLs         []string `json:"urls,omitempty" jsonschema:"URLs to scrape concurrently; failures come back as per-URL error entries (exactly one of url or urls)"`
+	Selector     string   `json:"selector,omitempty" jsonschema:"CSS selector to extract specific elements, skips readability (incompatible with raw)"`
+	Trim         bool     `json:"trim,omitempty" jsonschema:"strip markdown formatting, keep content text only (incompatible with raw)"`
+	MaxChars     int      `json:"max_chars,omitempty" jsonschema:"truncate markdown (or raw HTML) output to N characters per page (0 = disabled)"`
+	NoCache      bool     `json:"no_cache,omitempty" jsonschema:"bypass the page cache"`
+	Raw          bool     `json:"raw,omitempty" jsonschema:"return raw HTML in raw_html instead of extracted markdown"`
+	ForceBrowser bool     `json:"force_browser,omitempty" jsonschema:"always render via the configured headless browser, skipping JS-shell auto-detection (requires a configured browser)"`
+	NoLLMSTxt    bool     `json:"no_llms_txt,omitempty" jsonschema:"disable automatic /llms.txt detection for bare domain URLs"`
+	Concurrency  int      `json:"concurrency,omitempty" jsonschema:"max concurrent fetches for multi-URL scrapes (default 5, capped at 16)"`
 }
 
-// ScrapeOutput is the output schema for the "scrape" tool. It mirrors the
-// CLI's `ketch scrape --json` page shape.
+// ScrapeResult is one scraped page. It embeds scrape.Page — the same object
+// `ketch scrape --json` emits — plus the raw-mode fields (source, raw_html)
+// and a per-URL error slot used by batch scrapes.
+type ScrapeResult struct {
+	scrape.Page
+	Source  string `json:"source,omitempty" jsonschema:"fetch path that produced the page (http, http_shell, browser); raw mode only"`
+	RawHTML string `json:"raw_html,omitempty" jsonschema:"raw page HTML; set when raw is true"`
+	Error   string `json:"error,omitempty" jsonschema:"per-URL failure (batch scrapes only); other fields are empty when set"`
+}
+
+// ScrapeOutput is the output schema for the "scrape" tool: one entry per
+// requested URL, in input order.
 type ScrapeOutput struct {
-	URL        string `json:"url"`
-	FetchedURL string `json:"fetched_url,omitempty"`
-	Title      string `json:"title"`
-	Markdown   string `json:"markdown"`
+	Results []ScrapeResult `json:"results"`
 }
 
-func registerScrapeTool(s *mcpsdk.Server, cfg *config.Config) {
-	mcpsdk.AddTool(s, &mcpsdk.Tool{
-		Name:        "scrape",
-		Description: "Fetch a single URL, extract the main content, and convert it to clean markdown.",
+func (s *Server) registerScrapeTool() {
+	mcpsdk.AddTool(s.mcp, &mcpsdk.Tool{
+		Name: "scrape",
+		Description: "Fetch one or more URLs, extract the main content, and convert it to clean markdown (or raw HTML with raw=true). " +
+			"Bare domains are auto-probed for /llms.txt first unless no_llms_txt is set. " +
+			"Note: the server fetches whatever URL it is given, including private or internal addresses reachable from where it runs." +
+			errTaxonomy,
+		Annotations: readOnlyOpenWorld(),
 	}, func(ctx context.Context, _ *mcpsdk.CallToolRequest, in ScrapeInput) (*mcpsdk.CallToolResult, ScrapeOutput, error) {
-		if in.URL == "" {
-			return nil, ScrapeOutput{}, fmt.Errorf("url is required")
-		}
-
-		scraper, err := newMCPScraper(cfg)
-		if err != nil {
+		if err := s.validateScrapeInput(in); err != nil {
 			return nil, ScrapeOutput{}, err
 		}
-		defer scraper.Close()
 
-		pc := newMCPPageCache(cfg, in.NoCache)
-		defer pc.Close()
-
-		var page *scrape.Page
-		if in.Selector != "" {
-			page, err = scrapeWithSelector(ctx, scraper, in.URL, in.Selector)
-		} else {
-			page, err = cachedScrape(ctx, scraper, pc, in.URL)
+		if in.URL != "" {
+			res, err := s.scrapeOne(ctx, in.URL, in)
+			if err != nil {
+				return nil, ScrapeOutput{}, err
+			}
+			return nil, ScrapeOutput{Results: []ScrapeResult{res}}, nil
 		}
-		if err != nil {
-			return nil, ScrapeOutput{}, fmt.Errorf("scrape failed: %w", err)
-		}
-
-		return nil, ScrapeOutput{
-			URL:        page.URL,
-			FetchedURL: page.FetchedURL,
-			Title:      page.Title,
-			Markdown:   postProcess(page.Markdown, in.Trim, in.MaxChars),
-		}, nil
+		return nil, ScrapeOutput{Results: s.scrapeBatch(ctx, in)}, nil
 	})
 }
 
-// newMCPScraper mirrors cmd.newScraper: builds a Scraper from cfg's compiled
-// URL rewriter and optional browser binary. Returned scraper must be Closed
-// by the caller.
-func newMCPScraper(cfg *config.Config) (*scrape.Scraper, error) {
-	rw, err := urlrewrite.NewRewriter(cfg.URLRewrites)
-	if err != nil {
-		return nil, fmt.Errorf("invalid url_rewrites: %w", err)
+// validateScrapeInput enforces the url/urls union and the CLI's flag
+// compatibility rules, plus the force-browser precondition.
+func (s *Server) validateScrapeInput(in ScrapeInput) error {
+	if (in.URL == "") == (len(in.URLs) == 0) {
+		return errf(kindValidation, "provide exactly one of url or urls")
 	}
-	return scrape.NewWithConfig(cfg.Browser, rw, cfg.SPAMarkers), nil
+	if in.Raw && in.Selector != "" {
+		return errf(kindValidation, "raw cannot be combined with selector (selector is extraction-oriented)")
+	}
+	if in.Raw && in.Trim {
+		return errf(kindValidation, "raw cannot be combined with trim (trim is markdown-specific)")
+	}
+	// Hard opt-in like the CLI: never silently fall back to HTTP.
+	if in.ForceBrowser && !s.scraper.HasBrowser() {
+		return errf(kindPrecondition, "force_browser requires a configured browser (set with: ketch config set browser chrome)")
+	}
+	return nil
 }
 
-// newMCPPageCache mirrors cmd.newPageCache: creates a cache from cfg, or nil
-// if disabled.
-func newMCPPageCache(cfg *config.Config, noCache bool) *cache.Cache {
-	if noCache {
-		return nil
+// scrapeOne fetches a single URL, applying selector, raw, and llms.txt
+// detection the same way `ketch scrape` does for a single argument.
+func (s *Server) scrapeOne(ctx context.Context, rawURL string, in ScrapeInput) (ScrapeResult, error) {
+	pc := s.pageCache(in.NoCache)
+
+	if in.Selector != "" {
+		page, err := s.scraper.ScrapeSelector(ctx, rawURL, in.Selector, in.ForceBrowser)
+		if err != nil {
+			return ScrapeResult{}, classifySelectorErr(err)
+		}
+		page.Markdown = extract.PostProcess(page.Markdown, in.Trim, in.MaxChars)
+		return ScrapeResult{Page: *page}, nil
 	}
-	ttl, err := time.ParseDuration(cfg.CacheTTL)
+
+	// raw bypasses the llms.txt probe and markdown post-processing: it is an
+	// output mode over the fetched HTML, not an extraction mode.
+	if in.Raw {
+		page, rawHTML, source, err := s.scraper.ScrapeRaw(ctx, pc, rawURL, in.ForceBrowser)
+		if err != nil {
+			return ScrapeResult{}, upstreamErrf(err, "scrape failed")
+		}
+		return ScrapeResult{Page: *page, Source: source, RawHTML: extract.Truncate(rawHTML, in.MaxChars)}, nil
+	}
+
+	// llms.txt auto-detection for bare domains. Skipped under force_browser:
+	// the caller explicitly wants the rendered page, not an /llms.txt shortcut.
+	if !in.NoLLMSTxt && !in.ForceBrowser {
+		if content, ok := scrape.FetchLLMSTxt(ctx, rawURL); ok {
+			page := scrape.Page{URL: rawURL, Title: "llms.txt", Markdown: extract.PostProcess(content, in.Trim, in.MaxChars)}
+			return ScrapeResult{Page: page}, nil
+		}
+	}
+
+	page, err := s.scraper.ScrapeMarkdown(ctx, pc, rawURL, in.ForceBrowser)
 	if err != nil {
-		ttl = time.Hour
+		return ScrapeResult{}, upstreamErrf(err, "scrape failed")
 	}
-	return cache.New(ttl)
+	page.Markdown = extract.PostProcess(page.Markdown, in.Trim, in.MaxChars)
+	return ScrapeResult{Page: *page}, nil
 }
 
-// cachedScrape mirrors cmd.cachedScrape: checks the cache first, falls back
-// to fetch+extract.
-func cachedScrape(ctx context.Context, s *scrape.Scraper, pc *cache.Cache, url string) (*scrape.Page, error) {
-	key := s.Rewrite(url)
-	if page, source := pc.Get(key); page != nil && !scrape.CacheStaleForBrowser(source, s.HasBrowser()) {
-		return page, nil
+// scrapeBatch fetches in.URLs through a bounded worker pool over the shared
+// scraper and cache. Failures land in that entry's Error field instead of
+// failing the whole call; results keep input order.
+func (s *Server) scrapeBatch(ctx context.Context, in ScrapeInput) []ScrapeResult {
+	concurrency := in.Concurrency
+	if concurrency <= 0 {
+		concurrency = defaultScrapeConcurrency
+	}
+	if concurrency > maxScrapeConcurrency {
+		concurrency = maxScrapeConcurrency
 	}
 
-	page, source, err := s.Scrape(ctx, url)
-	if err != nil {
-		return nil, err
-	}
+	results := make([]ScrapeResult, len(in.URLs))
+	sem := make(chan struct{}, concurrency)
+	var wg sync.WaitGroup
+	for i, u := range in.URLs {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(idx int, rawURL string) {
+			defer wg.Done()
+			defer func() { <-sem }()
 
-	pc.Put(key, page, source)
-	return page, nil
+			res, err := s.scrapeOne(ctx, rawURL, in)
+			if err != nil {
+				results[idx] = ScrapeResult{Page: scrape.Page{URL: rawURL}, Error: err.Error()}
+				return
+			}
+			results[idx] = res
+		}(i, u)
+	}
+	wg.Wait()
+	return results
 }
 
-// scrapeWithSelector mirrors cmd.scrapeURLWithSelector: fetches a URL and
-// extracts content matching a CSS selector, bypassing the page cache and
-// readability extraction.
-func scrapeWithSelector(ctx context.Context, s *scrape.Scraper, rawURL, selector string) (*scrape.Page, error) {
-	fetchURL := s.Rewrite(rawURL)
-	html, err := s.Fetch(ctx, fetchURL)
-	if err != nil {
-		return nil, fmt.Errorf("fetch failed: %w", err)
+// classifySelectorErr maps the scrape package's selector sentinels to error
+// kinds: bad selector → validation, no match → not_found, anything else
+// (fetch/browser failure) → upstream/cancelled.
+func classifySelectorErr(err error) error {
+	switch {
+	case errors.Is(err, scrape.ErrBadSelector):
+		return errf(kindValidation, "%w", err)
+	case errors.Is(err, scrape.ErrSelectorNoMatch):
+		return errf(kindNotFound, "%w", err)
+	default:
+		return upstreamErrf(err, "scrape failed")
 	}
-	html, _ = s.MaybeBrowserFetch(ctx, fetchURL, html)
-
-	markdown, err := extract.ExtractSelector(html, selector)
-	if err != nil {
-		return nil, fmt.Errorf("selector extraction failed: %w", err)
-	}
-	if markdown == "" {
-		return nil, fmt.Errorf("no elements matched selector %q", selector)
-	}
-
-	page := &scrape.Page{URL: rawURL, Title: extract.Title(html), Markdown: markdown}
-	if fetchURL != rawURL {
-		page.FetchedURL = fetchURL
-	}
-	return page, nil
-}
-
-// postProcess mirrors cmd.postProcess: applies trim then truncate to
-// markdown content.
-func postProcess(s string, trim bool, maxChars int) string {
-	if trim {
-		s = extract.StripMarkdown(s)
-	}
-	return truncateContent(s, maxChars)
-}
-
-// truncateContent mirrors cmd.truncateContent: caps s at maxChars Unicode
-// code points, appending a truncation marker.
-func truncateContent(s string, maxChars int) string {
-	if maxChars <= 0 || utf8.RuneCountInString(s) <= maxChars {
-		return s
-	}
-	runes := []rune(s)
-	return string(runes[:maxChars]) + "\n\n[truncated]"
 }

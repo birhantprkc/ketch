@@ -43,7 +43,12 @@ func runDocs(cmd *cobra.Command, args []string) error {
 		return runDocsResolve(cmd, query, asJSON)
 	}
 
-	if library != "" && backend == "context7" {
+	if library != "" {
+		// --library is a Context7 concept; with any other backend it used to
+		// be dropped silently and the query re-routed. Reject loudly instead.
+		if backend != "context7" {
+			return exitErrf(ExitValidation, "--library requires the context7 backend (got %q)", backend)
+		}
 		return runDocsWithLibrary(cmd, query, library, tokens, asJSON, minimal)
 	}
 

@@ -26,7 +26,14 @@ func init() {
 
 func runMCPServe(cmd *cobra.Command, _ []string) error {
 	v, _, _ := versionInfo()
-	server := ketchmcp.NewServer(&cfg, v)
+	server, err := ketchmcp.NewServer(&cfg, v)
+	if err != nil {
+		return exitErrf(ExitPrecondition, "mcp server init failed: %w", err)
+	}
+	// The server holds shared, process-lifetime resources (headless browser,
+	// bbolt cache handle); release them when Run returns — client disconnect
+	// or ctx cancellation (SIGINT/SIGTERM via main.go's signal context).
+	defer server.Close()
 	if err := server.Run(cmd.Context(), &mcpsdk.StdioTransport{}); err != nil {
 		return exitErrf(ExitUpstream, "mcp server failed: %w", err)
 	}
