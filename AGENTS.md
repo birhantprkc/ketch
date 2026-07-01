@@ -85,7 +85,7 @@ ketch crawl status [id]                     # check crawl progress
 ketch crawl stop <id>                       # stop a background crawl
 ketch browser status                        # check browser config
 ketch browser install                       # download Chromium
-ketch code "query"                          # code search (sourcegraph)
+ketch code "query"                          # code search (grepapp)
 ketch code "query" --lang go               # with language filter
 ketch docs "query"                          # docs search (context7)
 ketch docs "query" --library /org/repo     # skip resolve, fetch directly
@@ -112,8 +112,8 @@ ketch mcp serve                             # run as an MCP server over stdio (s
 | --background | crawl | false | Run in background |
 | --allow | crawl | — | Path substring filters |
 | --deny | crawl | — | Regex deny patterns |
-| --backend, -b | code | sourcegraph | Code backend (sourcegraph/github) |
-| --backend, -b | docs | context7 | Docs backend (context7/local) |
+| --backend, -b | code | grepapp | Code backend (grepapp/sourcegraph/github) |
+| --backend, -b | docs | context7 | Docs backend (context7; local is planned, not implemented) |
 | --lang | code | — | Language qualifier (appended to query) |
 | --library | docs | — | Context7 library ID, skips resolve |
 | --tokens | docs | 4000 | Context7 token budget |
