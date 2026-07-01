@@ -52,6 +52,24 @@ func TestMCPServerSmoke(t *testing.T) {
 	}
 	defer session.Close()
 
+	t.Run("InitializeInstructions", func(t *testing.T) {
+		init := session.InitializeResult()
+		if init == nil {
+			t.Fatal("no initialize result on session")
+		}
+		if init.Instructions == "" {
+			t.Fatal("initialize returned empty instructions")
+		}
+		// Pin the load-bearing content: tool routing, config-driven defaults,
+		// the error taxonomy, and the output-size advice.
+		for _, want := range []string{"search", "code", "docs", "scrape", "crawl", "ketch config", "[upstream]", "[precondition]", "max_chars"} {
+			if !strings.Contains(init.Instructions, want) {
+				t.Errorf("instructions missing %q", want)
+			}
+		}
+		t.Logf("initialize instructions: %d bytes", len(init.Instructions))
+	})
+
 	t.Run("ToolsListWithAnnotations", func(t *testing.T) {
 		toolsRes, err := session.ListTools(ctx, nil)
 		if err != nil {
