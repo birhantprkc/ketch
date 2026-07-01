@@ -15,7 +15,7 @@ import (
 var codeCmd = &cobra.Command{
 	Use:   "code <query>",
 	Short: "Search code across open-source repositories",
-	Long:  `Search code using Grep (default; mcp.grep.app, no token, literal/regex over 1M+ public repos), Sourcegraph, or GitHub Code Search. Supports language filtering and per-backend query qualifiers.`,
+	Long:  `Search code using Grep (mcp.grep.app; no token, literal/regex over 1M+ public repos), Sourcegraph, or GitHub Code Search (default: the configured backend; grepapp if unset). Supports language filtering and per-backend query qualifiers.`,
 	Args:  exitArgs(cobra.MinimumNArgs(1)),
 	RunE:  runCode,
 }
@@ -51,7 +51,10 @@ func runCode(cmd *cobra.Command, args []string) error {
 	})
 	if err != nil {
 		if errors.Is(err, code.ErrRegexpUnsupported) {
-			return exitErrf(ExitPrecondition, "backend %q does not support --regex (try -b grepapp or -b sourcegraph)", backend)
+			// Validation, not precondition: the request is wrong for this
+			// backend and no operator action or retry can make it succeed.
+			// Mirrors the MCP code tool's [validation] classification.
+			return exitErrf(ExitValidation, "backend %q does not support --regex (try -b grepapp or -b sourcegraph)", backend)
 		}
 		return exitErrf(ExitUpstream, "code search failed: %w", err)
 	}

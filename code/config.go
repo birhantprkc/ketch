@@ -3,6 +3,7 @@ package code
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/1broseidon/ketch/config"
 )
@@ -31,6 +32,6 @@ func NewFromConfig(cfg *config.Config, backend string) (Searcher, error) {
 		}
 		return NewGitHub(token), nil
 	default:
-		return nil, fmt.Errorf("%w: %s", ErrUnknownBackend, backend)
+		return nil, fmt.Errorf("%w %q (available: %s)", ErrUnknownBackend, backend, strings.Join(config.AvailableCodeBackends(), ", "))
 	}
 }

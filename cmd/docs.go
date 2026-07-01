@@ -14,7 +14,7 @@ import (
 var docsCmd = &cobra.Command{
 	Use:   "docs <query>",
 	Short: "Search library documentation",
-	Long:  `Search library documentation using Context7 or a local FTS5 backend. Supports direct library ID lookup and library name resolution.`,
+	Long:  `Search library documentation using Context7 (default: the configured backend). Supports direct library ID lookup and library name resolution. A local FTS5 backend is planned but not yet implemented.`,
 	Args:  exitArgs(cobra.MinimumNArgs(1)),
 	RunE:  runDocs,
 }
@@ -40,7 +40,7 @@ func runDocs(cmd *cobra.Command, args []string) error {
 	minimal, _ := cmd.Flags().GetBool("minimal")
 
 	if resolve {
-		return runDocsResolve(cmd, query, asJSON)
+		return runDocsResolve(cmd, query, limit, asJSON)
 	}
 
 	if library != "" {
@@ -59,7 +59,7 @@ func runDocs(cmd *cobra.Command, args []string) error {
 
 	results, err := searcher.Search(cmd.Context(), query, limit)
 	if err != nil {
-		return exitErrf(ExitUpstream, "docs search failed: %w", err)
+		return upstreamErr(err, "docs search failed")
 	}
 
 	if asJSON {
@@ -70,15 +70,15 @@ func runDocs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runDocsResolve(cmd *cobra.Command, query string, asJSON bool) error {
+func runDocsResolve(cmd *cobra.Command, query string, limit int, asJSON bool) error {
 	if cfg.Context7APIKey == "" {
 		return exitErrf(ExitPrecondition, "context7: API key not set (get one then: ketch config set context7_api_key <key>)")
 	}
 
 	c7 := docs.NewContext7(cfg.Context7APIKey)
-	matches, err := c7.ResolveLibrary(cmd.Context(), query)
+	matches, err := c7.ResolveLibrary(cmd.Context(), query, limit)
 	if err != nil {
-		return exitErrf(ExitUpstream, "resolve failed: %w", err)
+		return upstreamErr(err, "resolve failed")
 	}
 
 	if asJSON {
@@ -99,7 +99,7 @@ func runDocsWithLibrary(cmd *cobra.Command, query, library string, tokens int, a
 	c7 := docs.NewContext7(cfg.Context7APIKey)
 	results, err := c7.GetDocs(cmd.Context(), library, query, tokens)
 	if err != nil {
-		return exitErrf(ExitUpstream, "docs fetch failed: %w", err)
+		return upstreamErr(err, "docs fetch failed")
 	}
 
 	if asJSON {

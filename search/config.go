@@ -3,6 +3,7 @@ package search
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/1broseidon/ketch/config"
 )
@@ -10,7 +11,7 @@ import (
 // ErrUnknownBackend reports a backend name that is not a known search backend.
 // Callers classify errors wrapping it as validation failures (bad input);
 // any other NewFromConfig error is a missing precondition (e.g. API key).
-var ErrUnknownBackend = errors.New("unknown backend")
+var ErrUnknownBackend = errors.New("unknown search backend")
 
 // NewFromConfig builds the Searcher for backend, resolving API keys and
 // instance URLs from cfg exactly as the `ketch search` CLI does. searxngURL
@@ -38,6 +39,6 @@ func NewFromConfig(cfg *config.Config, backend, searxngURL string) (Searcher, er
 		}
 		return NewEXA(apiKey), nil
 	default:
-		return nil, fmt.Errorf("%w: %s", ErrUnknownBackend, backend)
+		return nil, fmt.Errorf("%w %q (available: %s)", ErrUnknownBackend, backend, strings.Join(config.AvailableBackends(), ", "))
 	}
 }

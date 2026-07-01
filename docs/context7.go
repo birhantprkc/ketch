@@ -67,7 +67,8 @@ type context7InfoSnippet struct {
 
 // Search resolves a library from the query and fetches documentation.
 func (c *Context7) Search(ctx context.Context, query string, limit int) ([]Result, error) {
-	libs, err := c.ResolveLibrary(ctx, query)
+	// Only the top-ranked library is used, so resolve just that one.
+	libs, err := c.ResolveLibrary(ctx, query, 1)
 	if err != nil {
 		return nil, fmt.Errorf("context7 resolve failed: %w", err)
 	}
@@ -78,8 +79,11 @@ func (c *Context7) Search(ctx context.Context, query string, limit int) ([]Resul
 	return c.GetDocs(ctx, libs[0].ID, query, 4000)
 }
 
-// ResolveLibrary searches Context7 for libraries matching the given name.
-func (c *Context7) ResolveLibrary(ctx context.Context, name string) ([]LibraryMatch, error) {
+// ResolveLibrary searches Context7 for libraries matching the given name,
+// returning at most limit matches (limit <= 0 means all). The Context7 search
+// endpoint has no server-side limit parameter, so the bound is applied here —
+// in the shared layer — so the CLI and MCP surfaces cannot diverge.
+func (c *Context7) ResolveLibrary(ctx context.Context, name string, limit int) ([]LibraryMatch, error) {
 	// Upstream param is `query` (was `q` on an older revision — API returns
 	// 400 "Query is required" if we send `q`).
 	u := fmt.Sprintf("https://context7.com/api/v1/search?query=%s", url.QueryEscape(name))
@@ -107,6 +111,9 @@ func (c *Context7) ResolveLibrary(ctx context.Context, name string) ([]LibraryMa
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		return nil, fmt.Errorf("failed to decode context7 resolve response: %w", err)
 	}
+	if limit > 0 && len(body.Results) > limit {
+		body.Results = body.Results[:limit]
+	}
 	return body.Results, nil
 }
 
@@ -129,6 +136,12 @@ func (c *Context7) GetDocs(ctx context.Context, libraryID, query string, tokens 
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return nil, fmt.Errorf("context7: invalid API key (set via: ketch config set context7_api_key <key>)")
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		// A 404 here means the library ID does not exist — permanently absent,
+		// not a transient upstream failure. Wrap the sentinel so both surfaces
+		// map it to not-found instead of retryable-upstream.
+		return nil, fmt.Errorf("context7: library %q %w (resolve the exact ID with: ketch docs --resolve <name>)", libraryID, ErrNotFound)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("context7 docs returned status %d", resp.StatusCode)

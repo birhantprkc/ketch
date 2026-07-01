@@ -51,7 +51,7 @@ func (s *Server) registerDocsTool() {
 		}
 
 		if in.Resolve {
-			return s.docsResolve(ctx, in.Query)
+			return s.docsResolve(ctx, in.Query, limit)
 		}
 
 		if in.Library != "" {
@@ -78,13 +78,14 @@ func (s *Server) registerDocsTool() {
 	})
 }
 
-// docsResolve maps a free-form library name to Context7 library IDs.
-func (s *Server) docsResolve(ctx context.Context, query string) (*mcpsdk.CallToolResult, DocsOutput, error) {
+// docsResolve maps a free-form library name to Context7 library IDs,
+// returning at most limit matches.
+func (s *Server) docsResolve(ctx context.Context, query string, limit int) (*mcpsdk.CallToolResult, DocsOutput, error) {
 	c7, err := s.context7()
 	if err != nil {
 		return nil, DocsOutput{}, err
 	}
-	matches, err := c7.ResolveLibrary(ctx, query)
+	matches, err := c7.ResolveLibrary(ctx, query, limit)
 	if err != nil {
 		return nil, DocsOutput{}, upstreamErrf(err, "resolve failed")
 	}

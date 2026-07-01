@@ -31,7 +31,7 @@ type SearchOutput struct {
 func (s *Server) registerSearchTool() {
 	mcpsdk.AddTool(s.mcp, &mcpsdk.Tool{
 		Name: "search",
-		Description: "Search the web using Brave (default), DuckDuckGo, SearXNG, or Exa and return results (title, url, description). " +
+		Description: "Search the web using Brave, DuckDuckGo, SearXNG, or Exa (default: the configured backend) and return results (title, url, description). " +
 			"Set scrape=true to also fetch each result and include its content as markdown." + errTaxonomy,
 		Annotations: readOnlyOpenWorld(),
 	}, func(ctx context.Context, _ *mcpsdk.CallToolRequest, in SearchInput) (*mcpsdk.CallToolResult, SearchOutput, error) {

@@ -77,8 +77,11 @@ func AvailableBackends() []string {
 // AvailableCodeBackends returns the list of known code search backends.
 func AvailableCodeBackends() []string { return []string{"grepapp", "sourcegraph", "github"} }
 
-// AvailableDocBackends returns the list of known docs backends.
-func AvailableDocBackends() []string { return []string{"context7", "local"} }
+// AvailableDocBackends returns the list of usable docs backends. The local
+// FTS5 backend is planned but not implemented, so it is not advertised here;
+// docs.NewFromConfig still recognizes "local" and rejects it with a clear
+// precondition error.
+func AvailableDocBackends() []string { return []string{"context7"} }
 
 // Path returns the config file path (~/.config/ketch/config.json).
 func Path() (string, error) {

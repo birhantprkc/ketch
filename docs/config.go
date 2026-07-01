@@ -3,6 +3,7 @@ package docs
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/1broseidon/ketch/config"
 )
@@ -27,8 +28,11 @@ func NewFromConfig(cfg *config.Config, backend string) (Searcher, error) {
 		}
 		return NewContext7(cfg.Context7APIKey), nil
 	case "local":
+		// Recognized but planned-only: kept out of config.AvailableDocBackends
+		// so no surface advertises it, yet rejected as a precondition (not an
+		// unknown backend) because the name is reserved for the FTS5 stub.
 		return nil, fmt.Errorf("docs backend %q not yet implemented (use context7)", backend)
 	default:
-		return nil, fmt.Errorf("%w: %s", ErrUnknownBackend, backend)
+		return nil, fmt.Errorf("%w %q (available: %s)", ErrUnknownBackend, backend, strings.Join(config.AvailableDocBackends(), ", "))
 	}
 }

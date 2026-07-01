@@ -27,7 +27,7 @@ type CodeOutput struct {
 func (s *Server) registerCodeTool() {
 	mcpsdk.AddTool(s.mcp, &mcpsdk.Tool{
 		Name: "code",
-		Description: "Search code across open-source repositories using Grep (default; mcp.grep.app), Sourcegraph, or GitHub Code Search." +
+		Description: "Search code across open-source repositories using Grep (mcp.grep.app), Sourcegraph, or GitHub Code Search (default: the configured backend)." +
 			errTaxonomy,
 		Annotations: readOnlyOpenWorld(),
 	}, func(ctx context.Context, _ *mcpsdk.CallToolRequest, in CodeInput) (*mcpsdk.CallToolResult, CodeOutput, error) {
