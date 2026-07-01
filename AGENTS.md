@@ -17,11 +17,13 @@ cmd/
   config.go                  Config command: discovery, init, set, path
   cache.go                   Cache command: stats, clear
   browser.go                 Browser command: install, status
+  mcp.go                     MCP command: `mcp serve` runs the MCP server over stdio
   proc_unix.go               Unix process management (detach, signals)
   proc_windows.go            Windows process management stub
 search/                      Searcher interface + Brave/DDG/SearXNG/EXA backends
 code/                        code.Searcher interface + Sourcegraph/GitHub backends
 docs/                        docs.Searcher interface + Context7/FTS5 backends
+mcp/                         MCP tool adapters (search/code/docs/scrape) over the go-sdk mcp package; same config/backend selection as the CLI
 scrape/                      HTTP fetch + Page type, JS detection fallback, Rod browser
 extract/                     readability + html-to-markdown pipeline, JS shell detection (Detector: built-in + config spa_markers, modern hydration/streaming frameworks)
 crawl/                       BFS crawler, work queue + worker pool, background status
@@ -78,6 +80,7 @@ ketch docs "query" --library /org/repo     # skip resolve, fetch directly
 ketch docs --resolve "library name"        # resolve library name → Context7 IDs
 ketch config                                # show effective config + backends
 ketch cache                                 # show cache stats
+ketch mcp serve                             # run as an MCP server over stdio (search/code/docs/scrape tools)
 ```
 
 ## Flags

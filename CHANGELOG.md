@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `ketch mcp serve` — runs ketch as an MCP (Model Context Protocol) server over stdio, exposing `search`, `code`, `docs`, and `scrape` as MCP tools via `github.com/modelcontextprotocol/go-sdk`. Tool handlers call the same underlying packages and resolve backends/API keys from the same `~/.config/ketch/` config the CLI uses, so an agent talking MCP sees the same configured backends as a human using `ketch` directly. `crawl`, `cache`, and `config` are not exposed as tools in this phase.
 - MIT `LICENSE` file. Resolves pkg.go.dev's "License: None detected" (which had hidden the package docs) and satisfies the awesome-go licensing requirement.
 - README badges: pkg.go.dev (Go Reference) and Go Report Card, plus GitHub stars and latest release.
 - CI workflow (`.github/workflows/ci.yml`) running build, lint (golangci-lint), and test on pushes to `main` and pull requests, with a `make build-check` target (`go build ./...`) for the build job.
