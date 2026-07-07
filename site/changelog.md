@@ -2,13 +2,48 @@
 
 This page mirrors the canonical [`CHANGELOG.md`](https://github.com/1broseidon/ketch/blob/main/CHANGELOG.md) in the repo root. Versions follow [Semantic Versioning](https://semver.org/) and match the published git tags.
 
-## Unreleased
+## v0.11.0 — 2026-07-07
 
 **Added**
 
+- **Federated multi-backend search**: `ketch search --multi` (and the MCP `search` tool's `multi` input) queries several backends at once and fuses their rankings with [Reciprocal Rank Fusion](https://doi.org/10.1145/1571941.1572114), so a page multiple engines rank highly rises to the top. Bare `--multi` federates every usable backend (zero-config installs still get ddg + exa + keenable); `--multi=brave,exa` picks an explicit set (the `=` is required for a list). Results are deduplicated by URL canonicalization, each backend gets a 10s timeout with graceful degradation (`failed:` frontmatter / additive MCP `errors` map), and every fused result lists the engines that found it.
 - `firecrawl` web search backend via the [Firecrawl](https://docs.firecrawl.dev) v2 search API, configured with `ketch config set firecrawl_api_key <key>` and selected with `-b firecrawl`. Reports `firecrawl_api_key_set` in `ketch config` discovery and is covered by a live `ketch doctor` probe.
 - `keenable` web search backend over the Keenable index, built for AI agents. Keyless by default (public endpoint, rate-limited); an optional `keenable_api_key` lifts the rate limit.
+- `ketch extract` — pipe HTML through ketch's readability + markdown pipeline with no fetch: `curl -L <url> | ketch extract`. Supports `--url` (metadata + relative-link resolution), `--select`, `--trim`, `--max-chars`, and the global `--json`; deliberately no cache, browser, or MCP surface.
+- Claude Code plugin + marketplace manifest: `claude plugin marketplace add 1broseidon/ketch`, then `claude plugin install ketch@ketch` wires up `ketch mcp serve` and the bundled agent skill. Optional convenience — the stateless CLI remains the zero-infrastructure path.
+
+## v0.10.0 — 2026-07-01
+
+**Added**
+
+- `ketch mcp serve` — ketch as an MCP server over stdio, exposing `search`, `code`, `docs`, `scrape`, and `crawl` with the same config-driven backends as the CLI, stable `[kind]` error prefixes mirroring the CLI exit codes, and concise server instructions in the initialize result.
+- Bundled agent skill at `skills/ketch/` — a SKILL.md playbook any skill-loading agent can install: surface routing, token budgets, error-prefix control flow, a deep-research recipe, and a guided backend-setup flow.
+- `ketch doctor` — deterministic live health checks for every surface (search/code/docs backends, browser, cache) with `ok` / `no_key` / `unreachable` / `misconfigured` statuses, fix hints (including the SearXNG `format: json` trap), aligned human output or stable `--json`.
+- Key-presence booleans in `ketch config` discovery (`brave_api_key_set`, `exa_api_key_set`, `context7_api_key_set`, `github_token_set`) so agents can tell "unconfigured" from "ready" in one call.
+- Shared config-driven constructors (`search/code/docs/scrape/cache.NewFromConfig`) used by both the CLI and MCP server, ending backend-switch drift. MIT LICENSE file.
+
+**Changed**
+
+- `ketch docs --library` on a non-context7 backend and `ketch code --regex` on GitHub are clear validation errors instead of silent re-routes; the unimplemented `local` docs backend is rejected up front and no longer advertised.
+
+**Fixed**
+
+- Context7 404s classify as not-found (exit 3) instead of retryable-upstream; `docs --resolve` respects `--limit`; `ketch cache --json` emits stable JSON; unknown-backend errors list the valid options; a data race in the scraper's browser-binary resolution.
+
+## v0.9.5 — 2026-06-29
+
+**Fixed**
+
+- Tables render as GFM pipe tables across readability, raw, and selector extraction paths (#14).
+- Brave searches cap the API `count` at Brave's per-request maximum of 20, preventing HTTP 422 when `--limit` is higher (#17).
+- Client-rendered SPA pages (e.g. Next.js App Router) are no longer misdetected as static; adds a `spa_markers` config key to extend detection (#15).
+
+## v0.9.4 — 2026-06-22
+
+**Added**
+
 - `exa` web search backend via Exa's hosted MCP endpoint, with optional `exa_api_key` config for authenticated usage.
+- `ketch scrape --force-browser` — always render via the configured browser, skipping JS-shell auto-detection (#12); composes with `--raw` and `--select`. Documents the previously-undocumented `--raw` flag (#11).
 
 ## v0.9.3 — 2026-05-29
 
