@@ -85,6 +85,13 @@ ketch scrape https://example.com --json
 # {"url":"https://example.com","title":"Example Domain","markdown":"..."}
 ```
 
+Pipe any HTML through ketch's readability + markdown pipeline without a fetch:
+
+```sh
+curl -L https://chain.sh/ketch | ketch extract
+cat page.html | ketch extract --select article --max-chars 4000
+```
+
 ## Commands
 
 | Command | What it does |
@@ -93,6 +100,7 @@ ketch scrape https://example.com --json
 | `code` | Grep real OSS source — Grep (default), Sourcegraph, or GitHub Code Search |
 | `docs` | Library/framework docs — Context7 (curated, version-aware snippets) |
 | `scrape` | Fetch URL(s) and extract clean markdown; concurrent batch, JSON array, file, or stdin input |
+| `extract` | Convert piped HTML to clean markdown (`curl ... \| ketch extract`) — no fetch, no cache, no browser |
 | `crawl` | BFS or sitemap crawl with optional background execution and status tracking |
 | `browser` | Manage headless Chrome for JS-rendered pages (`install`, `status`) |
 | `config` | Show effective config as JSON, or `init` / `set` / `path` |
@@ -143,6 +151,7 @@ Point an agent's system prompt at ketch instead of teaching it individual search
 Use `ketch` for external research — web pages, OSS code, library docs.
 - `ketch search "query"` / `ketch search "query" --scrape` for web results with optional full content
 - `ketch scrape <url> [url...]` for clean markdown from one or more URLs
+- `ketch extract` for already-fetched/piped HTML (`curl ... | ketch extract`) — no fetch, no cache, no browser
 - `ketch code "query" --lang go` for real OSS code with repo/line context
 - `ketch docs "query" --library /org/repo` for version-aware library docs
 - All commands support `--json`. `ketch config` reports active backends.

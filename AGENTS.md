@@ -10,6 +10,7 @@ cmd/
   root.go                    Cobra root, global flag (--json)
   search.go                  Search command: query → results, optional --scrape
   scrape.go                  Scrape command: URLs → markdown, concurrent batch
+  extract.go                 Extract command: piped HTML → markdown (no fetch/cache/browser)
   crawl.go                   Crawl command: BFS/sitemap crawl with streaming output
   crawl_bg.go                Background crawl: status, stop subcommands, worker mode
   code.go                    Code search command: query → snippet results, --lang qualifier
@@ -83,6 +84,7 @@ ketch scrape <url1> <url2> <url3>           # concurrent batch scrape
 ketch scrape urls.txt                       # file with one URL per line
 ketch scrape '["url1","url2"]'              # JSON array of URLs
 echo "url1\nurl2" | ketch scrape            # stdin pipe
+curl -L https://example.com | ketch extract # piped HTML → markdown (no fetch)
 ketch crawl <url>                           # BFS crawl
 ketch crawl <url> --sitemap                 # sitemap-based crawl
 ketch crawl <url> --background              # run in background
@@ -128,6 +130,10 @@ ketch mcp serve                             # run as an MCP server over stdio (s
 | --trim | scrape, search --scrape | false | Strip markdown formatting syntax, keep content text only |
 | --minimal | search, code, docs | false | One result per line, tab-separated, no frontmatter |
 | --select \<css\> | scrape | — | Extract only elements matching CSS selector (skips readability) |
+| --url | extract | — | Source URL for metadata and relative-link resolution (no fetch) |
+| --select \<css\> | extract | — | CSS selector to extract (skips readability) |
+| --trim | extract | false | Strip markdown formatting, keep content text only |
+| --max-chars N | extract | 0 (off) | Truncate markdown output to N chars, appends `[truncated]` |
 | --no-llms-txt | scrape | false | Disable automatic /llms.txt detection for bare domains |
 | --concurrency | scrape | 5 | Max concurrent requests for multi-URL scraping |
 | --force-browser | scrape | false | Always render via the configured browser, skipping JS-shell auto-detection (composes with --raw/--select; errors without a browser) |

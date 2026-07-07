@@ -132,6 +132,42 @@ ketch scrape https://example.com --no-cache
 
 Multiple URLs are scraped concurrently.
 
+## ketch extract
+
+Convert piped HTML to clean markdown. Reads raw HTML from stdin and runs
+ketch's readability + HTML-to-markdown pipeline — no fetch, no cache, no
+browser, no `/llms.txt` probe.
+
+```sh
+curl -L https://example.com | ketch extract
+cat page.html | ketch extract
+```
+
+**Input:** stdin only. Positional args and a non-piped terminal are rejected
+with exit `2`; for URLs use `ketch scrape <url>`.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--url` | — | Source URL for metadata and relative-link resolution (never fetched) |
+| `--select` | — | CSS selector to extract (skips readability) |
+| `--trim` | `false` | Strip markdown formatting, keep content text only |
+| `--max-chars` | `0` | Truncate markdown to N chars (0 = off), appends `[truncated]` |
+
+The global `--json` flag also applies. The scrape-only flags (`--raw`,
+`--no-cache`, `--concurrency`, `--force-browser`, `--no-llms-txt`) are not
+exposed.
+
+**Examples:**
+
+```sh
+curl -L https://chain.sh/ketch | ketch extract
+curl -L https://example.com | ketch extract --url https://example.com
+cat page.html | ketch extract --select article --max-chars 4000
+xclip -selection clipboard -o | ketch extract --trim --json
+```
+
 ## ketch crawl
 
 Crawl a site via BFS link discovery or sitemap.
