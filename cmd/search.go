@@ -33,6 +33,12 @@ func init() {
 	searchCmd.Flags().Int("max-chars", 0, "truncate markdown output to N chars (0 = disabled)")
 	searchCmd.Flags().Bool("trim", false, "strip markdown formatting, keep content text only")
 	searchCmd.Flags().Bool("minimal", false, "one result per line, tab-separated (url/title/snippet)")
+	// NoOptDefVal makes bare --multi mean "all usable backends". Cobra requires
+	// the = form to pass a value to such a flag: --multi=brave,exa (not
+	// --multi brave,exa, which would swallow the query as the value).
+	searchCmd.Flags().String("multi", "",
+		"federated search across backends: comma-separated list, or bare/=all for every usable backend (use the = form, e.g. --multi=brave,exa)")
+	searchCmd.Flags().Lookup("multi").NoOptDefVal = "all"
 }
 
 func runSearch(cmd *cobra.Command, args []string) error {
@@ -44,6 +50,10 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	maxChars, _ := cmd.Flags().GetInt("max-chars")
 	trim, _ := cmd.Flags().GetBool("trim")
 	minimal, _ := cmd.Flags().GetBool("minimal")
+
+	if cmd.Flags().Changed("multi") {
+		return runMultiSearch(cmd, query, limit, doScrape, asJSON, trim, maxChars, minimal)
+	}
 
 	searcher, err := newSearcher(cmd, backend)
 	if err != nil {
@@ -157,4 +167,143 @@ func newSearcher(cmd *cobra.Command, backend string) (search.Searcher, error) {
 		return nil, backendErr(err, search.ErrUnknownBackend)
 	}
 	return s, nil
+}
+
+// looksLikeBackendList reports whether s is a comma-separated list of two or
+// more known backend names (e.g. "brave,exa") — the shape of a --multi value
+// accidentally passed without '=' and parsed as the query.
+func looksLikeBackendList(s string) bool {
+	if !strings.Contains(s, ",") {
+		return false
+	}
+	known := map[string]bool{}
+	for _, b := range config.AvailableBackends() {
+		known[b] = true
+	}
+	parts := strings.Split(s, ",")
+	for _, p := range parts {
+		if !known[strings.TrimSpace(p)] {
+			return false
+		}
+	}
+	return len(parts) >= 2
+}
+
+// parseMultiNames splits a --multi value into trimmed, de-duplicated backend
+// names (first occurrence wins). A bare/empty or "all" value yields the "all"
+// sentinel handled by search.NewMultiFromConfig.
+func parseMultiNames(val string) []string {
+	var names []string
+	seen := map[string]bool{}
+	for _, part := range strings.Split(val, ",") {
+		name := strings.TrimSpace(part)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		names = append(names, name)
+	}
+	return names
+}
+
+// runMultiSearch handles `ketch search --multi`: it validates the flag
+// combination, resolves the federated backend set, fans out, and renders the
+// fused results (json / minimal / plain), warning about partial failures on
+// stderr per the house convention.
+func runMultiSearch(cmd *cobra.Command, query string, limit int, doScrape, asJSON, trim bool, maxChars int, minimal bool) error {
+	if cmd.Flags().Changed("backend") {
+		return exitErrf(ExitValidation, "--multi and --backend are mutually exclusive")
+	}
+
+	multiVal, _ := cmd.Flags().GetString("multi")
+	names := parseMultiNames(multiVal)
+	for _, n := range names {
+		if n == "all" && len(names) > 1 {
+			return exitErrf(ExitValidation, `--multi: "all" cannot be combined with other backend names`)
+		}
+	}
+	if len(names) == 0 {
+		names = []string{"all"}
+	}
+
+	// Defuse the NoOptDefVal trap: `--multi brave,exa <query>` parses as
+	// multi="all" with "brave,exa" swallowed as the query, silently searching
+	// the literal backend list. When bare --multi gets a query that is
+	// exactly a comma-list of known backend names, the operator almost
+	// certainly meant --multi=<list>.
+	if multiVal == "all" && looksLikeBackendList(query) {
+		return exitErrf(ExitValidation, "--multi needs '=' for a backend list: did you mean --multi=%s?", query)
+	}
+
+	searxngURL, _ := cmd.Flags().GetString("searxng-url")
+	m, err := search.NewMultiFromConfig(&cfg, names, searxngURL)
+	if err != nil {
+		return backendErr(err, search.ErrUnknownBackend)
+	}
+
+	results, berrs, err := m.Search(cmd.Context(), query, limit)
+	if err != nil {
+		return exitErrf(ExitUpstream, "search failed: %w", err)
+	}
+	for _, be := range berrs {
+		fmt.Fprintf(os.Stderr, "warn: %s: %v\n", be.Backend, be.Err)
+	}
+
+	if doScrape {
+		scraper, err := newScraper()
+		if err != nil {
+			return err
+		}
+		defer scraper.Close()
+		pc := newPageCache(false)
+		return searchScrape(cmd.Context(), results, scraper, pc, asJSON, trim, maxChars, minimal)
+	}
+
+	if asJSON {
+		return json.NewEncoder(os.Stdout).Encode(results)
+	}
+
+	if minimal {
+		for _, r := range results {
+			fmt.Printf("%s\t%s\t%s\t%s\n", r.URL, r.Title, r.Description, strings.Join(r.Backends, ","))
+		}
+		return nil
+	}
+
+	// Frontmatter: backends: lists the engines that contributed; failed: (only
+	// when partial) lists the ones that errored — together the resolved set.
+	failed := map[string]bool{}
+	for _, be := range berrs {
+		failed[be.Backend] = true
+	}
+	var succeeded []string
+	for _, n := range m.Names() {
+		if !failed[n] {
+			succeeded = append(succeeded, n)
+		}
+	}
+
+	fmt.Println("---")
+	fmt.Printf("query: %s\n", query)
+	fmt.Printf("backends: %s\n", strings.Join(succeeded, ", "))
+	if len(berrs) > 0 {
+		parts := make([]string, len(berrs))
+		for i, be := range berrs {
+			parts[i] = fmt.Sprintf("%s (%v)", be.Backend, be.Err)
+		}
+		fmt.Printf("failed: %s\n", strings.Join(parts, ", "))
+	}
+	fmt.Printf("result_count: %d\n", len(results))
+	fmt.Println("---")
+	for _, r := range results {
+		fmt.Printf("%s\n  %s\n", r.Title, r.URL)
+		if r.Description != "" {
+			fmt.Printf("  %s\n", r.Description)
+		}
+		if len(r.Backends) > 0 {
+			fmt.Printf("  found in: %s\n", strings.Join(r.Backends, ", "))
+		}
+		fmt.Println()
+	}
+	return nil
 }

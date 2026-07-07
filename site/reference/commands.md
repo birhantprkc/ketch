@@ -13,6 +13,7 @@ ketch search <query> [flags]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--backend, -b` | `brave` | Search backend: `brave`, `ddg`, `searxng`, `exa`, `firecrawl`, `keenable` |
+| `--multi` | — | Federated search across backends: comma-separated list, or bare/`=all` for every usable backend. Mutually exclusive with `--backend`. |
 | `--limit, -l` | `5` | Max number of results |
 | `--scrape` | `false` | Fetch full content from each result |
 | `--minimal` | `false` | One result per line, tab-separated |
@@ -21,6 +22,28 @@ ketch search <query> [flags]
 | `--searxng-url` | `http://localhost:8081` | SearXNG instance URL |
 
 The global `--json` flag also applies.
+
+### Federated search (`--multi`)
+
+`--multi` queries several backends at once and fuses their rankings with
+[Reciprocal Rank Fusion](https://plg.uwaterloo.ca/~gvcormack/cormacksigir09-rrf.pdf)
+(RRF, k=60): a page several engines rank highly floats to the top, so the
+result is better than any single backend, not just longer. Results are
+deduplicated by URL canonicalization, and each result gains a `backends` list
+naming the engines that returned it.
+
+- Bare `ketch search --multi "query"` (or `--multi=all`) uses every *usable*
+  backend — the same key-presence rule ketch uses everywhere: `ddg`, `exa`, and
+  `keenable` always; `brave` and `firecrawl` only with a key; `searxng` always
+  (a dead instance just fails fast and is skipped).
+- `ketch search --multi=brave,exa "query"` queries exactly those, in that order.
+  An unknown name is a validation error (exit 2); a named-but-unconfigured
+  backend is a precondition error (exit 5).
+- Because `--multi` takes an optional value, pass a list with the `=` form
+  (`--multi=brave,exa`); `--multi brave,exa` would parse `brave,exa` as the query.
+- Backends that error or time out (10s each) are dropped and reported on stderr
+  as `warn:` lines (and in the plain-text `failed:` frontmatter key); the search
+  only fails (exit 4) when every backend fails.
 
 **Examples:**
 
@@ -32,6 +55,8 @@ ketch search "query" --backend searxng
 ketch search "query" --backend exa
 ketch search "query" --backend firecrawl
 ketch search "query" --backend keenable
+ketch search "rrf rank fusion" --multi                # every usable backend
+ketch search "rrf rank fusion" --multi=brave,ddg,exa  # a specific set
 ketch search "query" --json
 ```
 

@@ -30,7 +30,7 @@ Pre-commit hook (`.githooks/pre-commit`) runs gofmt, vet, lint, and tests. Git i
 
 Default output uses YAML frontmatter + markdown (cymbal style):
 - `ketch scrape` — frontmatter (url, title, words) + markdown body
-- `ketch search` — frontmatter (query, backend, result_count) + result list
+- `ketch search` — frontmatter (query, backend, result_count) + result list. Under `--multi` the frontmatter uses `backends:` (plural, the engines that contributed) plus a `failed:` key for partial failures, and each result gains a `found in:` line / `backends` JSON field
 - `--json` flag available on all commands for structured JSON output
 
 ### Output Flags (all commands)
@@ -38,7 +38,8 @@ Default output uses YAML frontmatter + markdown (cymbal style):
 |------|-------|---------|-------------|
 | `--max-chars N` | scrape, search --scrape | 0 (off) | Truncate markdown output to N chars, appends `[truncated]` |
 | `--trim` | scrape, search --scrape | false | Strip markdown formatting syntax, keep content text only (~30-40% token reduction) |
-| `--minimal` | search, code, docs | false | One result per line, tab-separated url/title/snippet, no frontmatter |
+| `--minimal` | search, code, docs | false | One result per line, tab-separated url/title/snippet, no frontmatter (a 4th backends column is appended under `search --multi`, plain search only — `--scrape --minimal` keeps 3 columns) |
+| `--multi[=list]` | search | — | Federated search across backends (RRF fusion, URL-dedup'd); bare/`=all` = every usable backend, `=brave,exa` = a set; mutually exclusive with `--backend` |
 | `--select <css>` | scrape | — | Extract only elements matching CSS selector (skips readability) |
 | `--no-llms-txt` | scrape | false | Disable automatic /llms.txt detection for bare domains |
 | `--raw` | scrape | false | Output raw HTML instead of markdown (skips `/llms.txt`; incompatible with `--select`/`--trim`) |

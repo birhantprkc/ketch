@@ -76,7 +76,14 @@ Web search needs a backend configured first — the default (`brave`) requires a
 ketch config set brave_api_key <key>
 ketch search "golang error handling"
 ketch search "golang error handling" --scrape   # fetch + extract full content per result
+ketch search "golang error handling" --multi    # federate across every usable backend, rank-fused
 ```
+
+`--multi` queries several backends at once and fuses their rankings with
+Reciprocal Rank Fusion (a page several engines rank highly floats to the top),
+deduplicating by URL and tagging each result with the engines that returned it.
+Bare `--multi` (or `--multi=all`) uses every usable backend; `--multi=brave,exa`
+picks a set (use the `=` form). See [`site/reference/commands.md`](./site/reference/commands.md).
 
 Every command takes `--json` for structured output:
 
@@ -149,7 +156,7 @@ Point an agent's system prompt at ketch instead of teaching it individual search
 
 ```markdown
 Use `ketch` for external research — web pages, OSS code, library docs.
-- `ketch search "query"` / `ketch search "query" --scrape` for web results with optional full content
+- `ketch search "query"` / `ketch search "query" --scrape` for web results with optional full content (add `--multi` to federate across backends and rank-fuse)
 - `ketch scrape <url> [url...]` for clean markdown from one or more URLs
 - `ketch extract` for already-fetched/piped HTML (`curl ... | ketch extract`) — no fetch, no cache, no browser
 - `ketch code "query" --lang go` for real OSS code with repo/line context

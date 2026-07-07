@@ -14,6 +14,7 @@ The two transports expose the same options under different spellings. Both direc
 | `--select <css>` | `selector` | scrape; skips readability; incompatible with `raw` |
 | positional URLs / JSON array / file / stdin | `url` (one) or `urls` (array) | CLI auto-detects the input form; MCP is explicit |
 | `--searxng-url` | `searxng_url` | search, searxng backend only |
+| `--multi[=list]` | `multi` (array; `["all"]` = every usable) | search; federated RRF search, mutually exclusive with `backend`; CLI needs the `=` form for a list |
 | `--resolve` | `resolve` | docs |
 | `--no-llms-txt` | `no_llms_txt` | scrape |
 | `--force-browser` | `force_browser` | scrape |
@@ -30,7 +31,8 @@ The two transports expose the same options under different spellings. Both direc
 - Backends: `brave` (default when unconfigured; free API key), `ddg` (zero setup; rate-limits readily under fan-out), `searxng` (self-hosted; needs a JSON-enabled instance — see the setup verb), `exa` (zero config), `firecrawl` (Firecrawl v2 search API; needs `firecrawl_api_key`), `keenable` (keyless by default; optional `keenable_api_key` lifts the rate limit).
 - The effective default backend is operator-configured: **omit `backend` to use it**; `ketch config` shows which it is.
 - `--scrape` / `scrape: true` fetches each result's full content — budget it exactly like a scrape (`max_chars`, `trim`).
-- `--minimal` (CLI): one result per line, tab-separated url/title/snippet.
+- `--minimal` (CLI): one result per line, tab-separated url/title/snippet (a 4th backends column is appended under `--multi` for plain search; `--scrape --minimal` keeps 3 columns).
+- `--multi` / `multi: [...]`: federated search — query several backends at once and rank-fuse with Reciprocal Rank Fusion (k=60), deduplicating by URL. Bare `--multi` / `["all"]` = every usable backend (key-presence rule); `--multi=brave,exa` / `["brave","exa"]` = a set (use the `=` form on the CLI). Each result gains a `backends` list (the engines that returned it — a consensus signal worth more than any single float). Backends that error or time out (10s each) are dropped: on the CLI they surface as `warn:` stderr lines + a `failed:` frontmatter key; on MCP as an additive `errors` map. The call fails ([upstream]/exit 4) only when every backend fails. Mutually exclusive with `backend`. Keys improve federation reliability (keyless `ddg`/`exa`/`keenable` rate-limit faster under fan-out).
 
 ## code
 
