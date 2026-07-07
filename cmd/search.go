@@ -211,28 +211,9 @@ func parseMultiNames(val string) []string {
 // fused results (json / minimal / plain), warning about partial failures on
 // stderr per the house convention.
 func runMultiSearch(cmd *cobra.Command, query string, limit int, doScrape, asJSON, trim bool, maxChars int, minimal bool) error {
-	if cmd.Flags().Changed("backend") {
-		return exitErrf(ExitValidation, "--multi and --backend are mutually exclusive")
-	}
-
-	multiVal, _ := cmd.Flags().GetString("multi")
-	names := parseMultiNames(multiVal)
-	for _, n := range names {
-		if n == "all" && len(names) > 1 {
-			return exitErrf(ExitValidation, `--multi: "all" cannot be combined with other backend names`)
-		}
-	}
-	if len(names) == 0 {
-		names = []string{"all"}
-	}
-
-	// Defuse the NoOptDefVal trap: `--multi brave,exa <query>` parses as
-	// multi="all" with "brave,exa" swallowed as the query, silently searching
-	// the literal backend list. When bare --multi gets a query that is
-	// exactly a comma-list of known backend names, the operator almost
-	// certainly meant --multi=<list>.
-	if multiVal == "all" && looksLikeBackendList(query) {
-		return exitErrf(ExitValidation, "--multi needs '=' for a backend list: did you mean --multi=%s?", query)
+	names, err := resolveMultiNames(cmd, query)
+	if err != nil {
+		return err
 	}
 
 	searxngURL, _ := cmd.Flags().GetString("searxng-url")
@@ -270,14 +251,49 @@ func runMultiSearch(cmd *cobra.Command, query string, limit int, doScrape, asJSO
 		return nil
 	}
 
-	// Frontmatter: backends: lists the engines that contributed; failed: (only
-	// when partial) lists the ones that errored — together the resolved set.
+	printMultiPlain(query, results, berrs, m.Names())
+	return nil
+}
+
+// resolveMultiNames validates the --multi flag combination and resolves the
+// requested backend-name list ("all" sentinel included).
+func resolveMultiNames(cmd *cobra.Command, query string) ([]string, error) {
+	if cmd.Flags().Changed("backend") {
+		return nil, exitErrf(ExitValidation, "--multi and --backend are mutually exclusive")
+	}
+
+	multiVal, _ := cmd.Flags().GetString("multi")
+	names := parseMultiNames(multiVal)
+	for _, n := range names {
+		if n == "all" && len(names) > 1 {
+			return nil, exitErrf(ExitValidation, `--multi: "all" cannot be combined with other backend names`)
+		}
+	}
+	if len(names) == 0 {
+		names = []string{"all"}
+	}
+
+	// Defuse the NoOptDefVal trap: `--multi brave,exa <query>` parses as
+	// multi="all" with "brave,exa" swallowed as the query, silently searching
+	// the literal backend list. When bare --multi gets a query that is
+	// exactly a comma-list of known backend names, the operator almost
+	// certainly meant --multi=<list>.
+	if multiVal == "all" && looksLikeBackendList(query) {
+		return nil, exitErrf(ExitValidation, "--multi needs '=' for a backend list: did you mean --multi=%s?", query)
+	}
+	return names, nil
+}
+
+// printMultiPlain renders the fused results with multi frontmatter:
+// backends: lists the engines that contributed; failed: (only when partial)
+// lists the ones that errored — together the resolved set.
+func printMultiPlain(query string, results []search.Result, berrs []search.BackendError, resolved []string) {
 	failed := map[string]bool{}
 	for _, be := range berrs {
 		failed[be.Backend] = true
 	}
 	var succeeded []string
-	for _, n := range m.Names() {
+	for _, n := range resolved {
 		if !failed[n] {
 			succeeded = append(succeeded, n)
 		}
@@ -305,5 +321,4 @@ func runMultiSearch(cmd *cobra.Command, query string, limit int, doScrape, asJSO
 		}
 		fmt.Println()
 	}
-	return nil
 }

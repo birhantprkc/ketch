@@ -273,57 +273,68 @@ func rankFuse(lists []backendResults) []scored {
 			return d.entries[a].backendIndex < d.entries[b].backendIndex
 		})
 
-		merged := d.entries[0].result // representative supplies URL and Title
-		if merged.Description == "" {
-			for _, e := range d.entries {
-				if e.result.Description != "" {
-					merged.Description = e.result.Description
-					break
-				}
-			}
-		}
-		if merged.Content == "" {
-			for _, e := range d.entries {
-				if e.result.Content != "" {
-					merged.Content = e.result.Content
-					break
-				}
-			}
-		}
-
-		names := make([]string, 0, len(d.entries))
-		nameSeen := make(map[string]bool, len(d.entries))
-		for _, e := range d.entries {
-			if !nameSeen[e.backendName] {
-				nameSeen[e.backendName] = true
-				names = append(names, e.backendName)
-			}
-		}
-		sort.Strings(names)
-		merged.Backends = names
-
+		merged, numBackends := mergeEntries(d.entries)
 		ranked = append(ranked, scored{
 			result:      merged,
 			key:         d.key,
 			score:       d.score,
-			numBackends: len(names),
+			numBackends: numBackends,
 			bestRank:    d.entries[0].rank,
 		})
 	}
 
-	sort.Slice(ranked, func(a, b int) bool {
-		x, y := ranked[a], ranked[b]
-		if math.Abs(x.score-y.score) > scoreEpsilon {
-			return x.score > y.score // 1. RRF score, descending
-		}
-		if x.numBackends != y.numBackends {
-			return x.numBackends > y.numBackends // 2. backend count, descending
-		}
-		if x.bestRank != y.bestRank {
-			return x.bestRank < y.bestRank // 3. best (min) rank, ascending
-		}
-		return x.key < y.key // 4. canonical URL, ascending — total order
-	})
-
+	sort.Slice(ranked, func(a, b int) bool { return lessScored(ranked[a], ranked[b]) })
 	return ranked
+}
+
+// mergeEntries collapses one document's per-backend entries: the first entry
+// (best rank, then backend order) is the representative supplying URL and
+// Title; Description and Content fall back down the same walk; Backends is
+// the sorted set of contributing engine names.
+func mergeEntries(entries []fusedEntry) (Result, int) {
+	merged := entries[0].result
+	if merged.Description == "" {
+		for _, e := range entries {
+			if e.result.Description != "" {
+				merged.Description = e.result.Description
+				break
+			}
+		}
+	}
+	if merged.Content == "" {
+		for _, e := range entries {
+			if e.result.Content != "" {
+				merged.Content = e.result.Content
+				break
+			}
+		}
+	}
+
+	names := make([]string, 0, len(entries))
+	nameSeen := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		if !nameSeen[e.backendName] {
+			nameSeen[e.backendName] = true
+			names = append(names, e.backendName)
+		}
+	}
+	sort.Strings(names)
+	merged.Backends = names
+	return merged, len(names)
+}
+
+// lessScored is the fusion tiebreak chain: RRF score desc, backend count
+// desc, best (min) rank asc, canonical URL asc — a total order, so output is
+// deterministic for any input.
+func lessScored(x, y scored) bool {
+	if math.Abs(x.score-y.score) > scoreEpsilon {
+		return x.score > y.score
+	}
+	if x.numBackends != y.numBackends {
+		return x.numBackends > y.numBackends
+	}
+	if x.bestRank != y.bestRank {
+		return x.bestRank < y.bestRank
+	}
+	return x.key < y.key
 }
