@@ -131,7 +131,7 @@ ketch mcp serve                             # run as an MCP server over stdio (s
 | --resolve | docs | false | Resolve library name instead of searching |
 | --max-chars N | scrape, search --scrape | 0 (off) | Truncate markdown output to N chars, appends `[truncated]` |
 | --trim | scrape, search --scrape | false | Strip markdown formatting syntax, keep content text only |
-| --minimal | search, code, docs | false | One result per line, tab-separated, no frontmatter |
+| --minimal | search, code, docs | false | One result per line, tab-separated, no frontmatter (a 4th backends column is appended under `search --multi`, plain search only) |
 | --select \<css\> | scrape | — | Extract only elements matching CSS selector (skips readability) |
 | --url | extract | — | Source URL for metadata and relative-link resolution (no fetch) |
 | --select \<css\> | extract | — | CSS selector to extract (skips readability) |

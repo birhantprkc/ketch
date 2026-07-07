@@ -12,8 +12,10 @@ Add this to your agent's system prompt (`CLAUDE.md`, `AGENTS.md`, or equivalent)
 Use `ketch` CLI for web search and page fetching.
 - Search: `ketch search "query"` — returns titles, URLs, and snippets
 - Search + full content: `ketch search "query" --scrape` — fetches and extracts each result
+- Federated search: `ketch search "query" --multi` — queries every usable backend and rank-fuses the results
 - Scrape: `ketch scrape <url>` — fetches a URL and returns clean markdown
 - Batch scrape: `ketch scrape <url1> <url2> ...` — concurrent fetch
+- Extract: `curl -L <url> | ketch extract` — pipe already-fetched HTML to clean markdown (no fetch)
 - Code search: `ketch code "query" --lang go` — real OSS code snippets
 - Library docs: `ketch docs "query" --library /org/repo` — library documentation
 - Crawl: `ketch crawl <url> --sitemap --background` — crawl a site, poll with `ketch crawl status`
@@ -99,3 +101,15 @@ The `*_set` booleans tell an agent whether a keyed backend is ready without
 firing a call (key values are never printed). For a live health check of every
 backend — reachability, key validity, browser, cache — run `ketch doctor
 --json` (CLI-only, not an MCP tool).
+
+## MCP Server
+
+For agents that speak MCP instead of shelling out, `ketch mcp serve` exposes
+the five research surfaces — `search`, `code`, `docs`, `scrape`, `crawl` — as
+MCP tools over stdio, using the same config and backends as the CLI. See the
+[command reference](/reference/commands#ketch-mcp). To register with Claude
+Code:
+
+```sh
+claude mcp add ketch -- ketch mcp serve
+```

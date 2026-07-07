@@ -5,7 +5,7 @@ const { theme } = useData()
 const features = [
   {
     title: 'Search + Scrape',
-    description: 'Web search via Brave, DuckDuckGo, or SearXNG. Scrape any URL to clean markdown. Combine both in one call with --scrape.',
+    description: 'Web search across six backends. Scrape any URL to clean markdown. Combine both in one call with --scrape, or federate backends with --multi.',
   },
   {
     title: 'Agent-Native Output',
@@ -25,7 +25,7 @@ const features = [
   },
   {
     title: 'Multiple Backends',
-    description: 'Brave Search API (free tier), DuckDuckGo HTML scraping, or self-hosted SearXNG. Switch backends with one config change.',
+    description: 'Brave, DuckDuckGo, SearXNG, Exa, Firecrawl, or Keenable for web search; Grep, Sourcegraph, or GitHub for code; Context7 for docs. Switch backends with one config change.',
   },
 ]
 </script>
@@ -54,7 +54,7 @@ const features = [
         <p class="tagline">Web search and scrape for agents</p>
         <span v-if="theme.version" class="version-tag">{{ theme.version }}</span>
       </div>
-      <p class="subtitle">Fast, stateless CLI for web search and page scraping. Search the web, fetch pages, extract clean markdown — all from one binary. Designed to be called by AI agents or directly from your terminal.</p>
+      <p class="subtitle">Fast, stateless CLI for web search, OSS code search, library docs, and page scraping. Search the web, fetch pages, extract clean markdown — all from one binary. Designed to be called by AI agents or directly from your terminal.</p>
 
       <!-- Install -->
       <div class="install-block">

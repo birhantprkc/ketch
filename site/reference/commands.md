@@ -40,7 +40,8 @@ naming the engines that returned it.
   An unknown name is a validation error (exit 2); a named-but-unconfigured
   backend is a precondition error (exit 5).
 - Because `--multi` takes an optional value, pass a list with the `=` form
-  (`--multi=brave,exa`); `--multi brave,exa` would parse `brave,exa` as the query.
+  (`--multi=brave,exa`); `--multi brave,exa` is rejected as a validation error
+  (exit 2) with a hint to use `--multi=brave,exa`.
 - Backends that error or time out (10s each) are dropped and reported on stderr
   as `warn:` lines (and in the plain-text `failed:` frontmatter key); the search
   only fails (exit 4) when every backend fails.
@@ -288,7 +289,7 @@ ketch cache clear         # remove all cached pages
 ## ketch doctor
 
 Run live health checks against every surface: search backends
-(brave/ddg/searxng/exa/firecrawl), code backends (grepapp/sourcegraph/github), docs
+(brave/ddg/searxng/exa/firecrawl/keenable), code backends (grepapp/sourcegraph/github), docs
 (context7), the configured browser binary, and the page cache. Probes run
 concurrently with a per-check timeout and are read-only (nothing is written
 to the cache).
@@ -305,6 +306,26 @@ cleanly skipped; exit `5` means a configured surface is broken: the default
 backend of a surface, a backend with an API key explicitly set, the configured
 browser, or the cache. Optional backends that merely lack a key do not fail
 the run.
+
+## ketch mcp
+
+Run ketch as an MCP (Model Context Protocol) server over stdio.
+
+```sh
+ketch mcp serve
+```
+
+Exposes the five research surfaces — `search`, `code`, `docs`, `scrape`,
+`crawl` — as MCP tools, using the same config and backends as the CLI.
+Tool errors carry the exit-code taxonomy as stable message prefixes:
+`[validation]`, `[not_found]`, `[upstream]`, `[precondition]`, `[cancelled]`.
+`extract`, `config`, `cache`, `doctor`, and background crawls stay CLI-only.
+
+To register with Claude Code:
+
+```sh
+claude mcp add ketch -- ketch mcp serve
+```
 
 ## ketch version
 

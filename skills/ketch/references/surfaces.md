@@ -1,6 +1,6 @@
 # Surfaces — flags, params, and per-surface behavior
 
-Verified against ketch v0.9.6 (main). Discipline 6 applies: `--help` and `ketch config` outrank this file.
+Verified against ketch v0.11.0 (main). Discipline 6 applies: `--help` and `ketch config` outrank this file.
 
 ---
 
@@ -57,6 +57,7 @@ The two transports expose the same options under different spellings. Both direc
 - `max_chars` truncates output and appends `[truncated]`. `trim` strips markdown syntax, keeps text (incompatible with `raw`). `--select`/`selector` extracts by CSS selector, skipping readability — no match is `[not_found]` / exit 3. `raw` returns HTML instead of markdown.
 - JS-rendered pages: JS-shell detection falls back to the configured headless browser automatically, same output shape. `force_browser` skips detection and errors without a configured browser (`[precondition]`).
 - Fetches are cached (see Cache below); `no_cache` bypasses.
+- Already hold the HTML? `curl -L <url> | ketch extract` runs the same readability + markdown pipeline with no fetch, cache, or browser (CLI-only; supports `--url`, `--select`, `--trim`, `--max-chars`).
 
 ## crawl
 

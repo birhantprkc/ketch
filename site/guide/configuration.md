@@ -41,7 +41,7 @@ The discovery payload:
 only — key values are never printed. `github_token_source` reports where the
 GitHub token was resolved from (`config`, `env`, `gh-cli`, or `none`), and
 `github_token_set` is true whenever that chain resolved a token.
-`url_rewrites` appears only when configured.
+`url_rewrites` and `spa_markers` appear only when configured.
 
 ## Setting Values
 
@@ -92,6 +92,7 @@ ketch config set github_token ghp_...
 | `cache_ttl` | `72h` | How long scraped pages stay cached (Go duration, e.g. `30m`, `4h`) |
 | `browser` | — | Browser for JS-rendered pages: `chrome`, `chromium`, or absolute path |
 | `url_rewrites` | — | Ordered regex rewrite rules applied before every fetch (see below) |
+| `spa_markers` | — | Extra JS-shell detection substrings (JSON array); pages containing one are treated as JS-rendered and re-fetched via the browser |
 
 Secrets (`brave_api_key`, `exa_api_key`, `firecrawl_api_key`, `keenable_api_key`, `context7_api_key`, `github_token`) are stored in
 plaintext in `config.json`; protect the file accordingly.
