@@ -26,7 +26,7 @@ The global `--json` flag also applies.
 ### Federated search (`--multi`)
 
 `--multi` queries several backends at once and fuses their rankings with
-[Reciprocal Rank Fusion](https://plg.uwaterloo.ca/~gvcormack/cormacksigir09-rrf.pdf)
+[Reciprocal Rank Fusion](https://doi.org/10.1145/1571941.1572114)
 (RRF, k=60): a page several engines rank highly floats to the top, so the
 result is better than any single backend, not just longer. Results are
 deduplicated by URL canonicalization, and each result gains a `backends` list
