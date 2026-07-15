@@ -2,7 +2,6 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/1broseidon/ketch?style=social)](https://github.com/1broseidon/ketch/stargazers)
 [![Go Reference](https://pkg.go.dev/badge/github.com/1broseidon/ketch.svg)](https://pkg.go.dev/github.com/1broseidon/ketch)
-[![Go Report Card](https://goreportcard.com/badge/github.com/1broseidon/ketch)](https://goreportcard.com/report/github.com/1broseidon/ketch)
 [![Latest Release](https://img.shields.io/github/v/release/1broseidon/ketch)](https://github.com/1broseidon/ketch/releases/latest)
 
 A stateless CLI for web search, code search, library docs, and scraping — one binary, no daemon, no API server to run.
@@ -77,7 +76,16 @@ ketch config set brave_api_key <key>
 ketch search "golang error handling"
 ketch search "golang error handling" --scrape   # fetch + extract full content per result
 ketch search "golang error handling" --multi    # federate across every usable backend, rank-fused
+ketch search "golang error handling" --random  # pick one random backend, fallback to rest on failure
 ```
+
+`--multi` queries several backends at once and fuses their rankings with
+Reciprocal Rank Fusion (a page several engines rank highly floats to the top),
+deduplicating by URL and tagging each result with the engines that returned it.
+`--random` shuffles the backend list, tries one, and falls back to the rest —
+ideal when you want one provider's results without wasting rate limits on all
+of them. Both support bare (all usable backends) or `=brave,exa` explicit lists.
+See [`site/reference/commands.md`](./site/reference/commands.md).
 
 `--multi` queries several backends at once and fuses their rankings with
 Reciprocal Rank Fusion (a page several engines rank highly floats to the top),
@@ -165,7 +173,7 @@ ketch config                               # print effective config + available 
 ketch config path                          # print the config file path
 ```
 
-Other configurable keys include per-backend API keys and URLs (`brave_api_key`, `context7_api_key`, `github_token`, `sourcegraph_url`, `exa_api_key`, `firecrawl_api_key`), `cache_ttl`, `url_rewrites` (regex rewrite rules applied before fetch), `spa_markers` (extra JS-shell detection tokens), `cookie_file` (see below), and the optional external PDF converter command/timeout. See the [config reference](https://1broseidon.github.io/ketch/) for the full list.
+Other configurable keys include per-backend API keys (`brave_api_key`, `brave_api_keys` for multi-key rotation, `exa_api_key`, `firecrawl_api_key`, `keenable_api_key`, `context7_api_key`, `github_token`), `sourcegraph_url`, `cache_ttl`, `url_rewrites` (regex rewrite rules applied before fetch), `spa_markers` (extra JS-shell detection tokens), `cookie_file` (see below), and the optional external PDF converter command/timeout. Multiple keys per provider are picked randomly per request to spread rate limits. See the [config reference](https://1broseidon.github.io/ketch/) for the full list.
 
 ### Cookies (BYO cookies.txt)
 
