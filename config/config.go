@@ -74,9 +74,14 @@ func (c Config) FirecrawlKeys() []string {
 func (c Config) KeenableKeys() []string { return mergeKeys(c.KeenableAPIKey, c.KeenableAPIKeys) }
 
 // ResolveGithubToken returns a token and the source it came from, walking the
-// resolution chain: explicit config → $GITHUB_TOKEN → $GH_TOKEN → `gh auth token`.
+// resolution chain: $KETCH_GITHUB_TOKEN → explicit config → $GITHUB_TOKEN →
+// $GH_TOKEN → `gh auth token`. github_token is deliberately excluded from the
+// generic env overlay so this chain stays the single owner of its precedence.
 // Source is one of: "config", "env", "gh-cli", "none". The token is never logged.
 func (c Config) ResolveGithubToken() (token, source string) {
+	if t := os.Getenv("KETCH_GITHUB_TOKEN"); t != "" {
+		return t, "env"
+	}
 	if c.GithubToken != "" {
 		return c.GithubToken, "config"
 	}
@@ -127,8 +132,13 @@ func AvailableCodeBackends() []string { return []string{"grepapp", "sourcegraph"
 // precondition error.
 func AvailableDocBackends() []string { return []string{"context7"} }
 
-// Path returns the config file path (~/.config/ketch/config.json).
+// Path returns the config file path: $KETCH_CONFIG if set, otherwise
+// ~/.config/ketch/config.json. KETCH_CONFIG redirects reads and writes
+// (config set) alike.
 func Path() (string, error) {
+	if p := os.Getenv("KETCH_CONFIG"); p != "" {
+		return p, nil
+	}
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
@@ -136,8 +146,10 @@ func Path() (string, error) {
 	return filepath.Join(dir, "ketch", "config.json"), nil
 }
 
-// Load reads the config file, falling back to defaults for missing fields.
-func Load() Config {
+// LoadFile reads the config file only (no env overlay), falling back to
+// defaults for missing fields. `ketch config set` reads and writes through
+// LoadFile so env-derived values are never persisted into the file.
+func LoadFile() Config {
 	cfg := Defaults()
 
 	path, err := Path()
@@ -155,6 +167,17 @@ func Load() Config {
 		return Defaults()
 	}
 	return cfg
+}
+
+// Load returns the effective config: file values overlaid with KETCH_*
+// environment variables (precedence: env > file > default), plus the
+// provenance of every env override. On invalid env values it returns a
+// best-effort config (valid vars applied, invalid ones skipped) alongside a
+// descriptive error; callers decide when to surface it.
+func Load() (LoadResult, error) {
+	cfg := LoadFile()
+	overrides, err := applyEnv(&cfg)
+	return LoadResult{Config: cfg, Overrides: overrides}, err
 }
 
 // Save writes the config to disk, creating the directory if needed.

@@ -84,14 +84,9 @@ Reciprocal Rank Fusion (a page several engines rank highly floats to the top),
 deduplicating by URL and tagging each result with the engines that returned it.
 `--random` shuffles the backend list, tries one, and falls back to the rest —
 ideal when you want one provider's results without wasting rate limits on all
-of them. Both support bare (all usable backends) or `=brave,exa` explicit lists.
+of them. Both support bare (all usable backends) or `=brave,exa` explicit lists, and both
+are mutually exclusive with `--backend` and each other.
 See [`site/reference/commands.md`](./site/reference/commands.md).
-
-`--multi` queries several backends at once and fuses their rankings with
-Reciprocal Rank Fusion (a page several engines rank highly floats to the top),
-deduplicating by URL and tagging each result with the engines that returned it.
-Bare `--multi` (or `--multi=all`) uses every usable backend; `--multi=brave,exa`
-picks a set (use the `=` form). See [`site/reference/commands.md`](./site/reference/commands.md).
 
 Every command takes `--json` for structured output:
 
@@ -172,6 +167,25 @@ ketch config set browser chrome            # enable browser fallback for JS-rend
 ketch config                               # print effective config + available backends
 ketch config path                          # print the config file path
 ```
+
+### Environment variables
+
+Every scalar config key can also be set through the environment as `KETCH_` + the upper-snake key name — handy for containers and CI where writing a config file is awkward:
+
+```sh
+KETCH_BRAVE_API_KEY=<key> ketch search "query"     # keys/tokens without touching disk
+KETCH_BACKEND=ddg KETCH_LIMIT=10 ketch search "query"
+KETCH_CONFIG=/etc/ketch/config.json ketch config    # point at an alternate config file
+```
+
+Precedence is **CLI flag > `KETCH_*` env > config file > built-in default**. Notes:
+
+- Per-provider key vars (`KETCH_BRAVE_API_KEY`, `KETCH_EXA_API_KEY`, `KETCH_FIRECRAWL_API_KEY`, `KETCH_KEENABLE_API_KEY`) accept a comma-separated list and replace the provider's whole key pool (there are no `*_API_KEYS` plural vars).
+- `KETCH_GITHUB_TOKEN` beats the config file, which beats an ambient `$GITHUB_TOKEN`/`$GH_TOKEN`.
+- `url_rewrites` and `spa_markers` are file-only (their JSON/regex values don't survive env quoting).
+- `ketch config` (show) reports an `env_overrides` section, so you can always see which effective values came from the environment; `ketch config set` writes only file values and never persists env-derived ones.
+- Invalid env values (e.g. `KETCH_LIMIT=abc`) fail loudly on commands that use config, naming the offending variable; `ketch version` and `ketch config set/path` still work.
+- Secret `KETCH_*` vars are stripped from the environment of spawned subprocesses (headless browser, external PDF converter).
 
 Other configurable keys include per-backend API keys (`brave_api_key`, `brave_api_keys` for multi-key rotation, `exa_api_key`, `firecrawl_api_key`, `keenable_api_key`, `context7_api_key`, `github_token`), `sourcegraph_url`, `cache_ttl`, `url_rewrites` (regex rewrite rules applied before fetch), `spa_markers` (extra JS-shell detection tokens), `cookie_file` (see below), and the optional external PDF converter command/timeout. Multiple keys per provider are picked randomly per request to spread rate limits. See the [config reference](https://1broseidon.github.io/ketch/) for the full list.
 

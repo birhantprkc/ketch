@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/1broseidon/ketch/config"
 	"github.com/google/shlex"
 )
 
@@ -39,6 +40,9 @@ type execPDFCommandRunner struct{}
 
 func (execPDFCommandRunner) Run(ctx context.Context, name string, args []string, stdout, stderr io.Writer) error {
 	cmd := exec.CommandContext(ctx, name, args...)
+	// Scrub KETCH_* secret vars (API keys, tokens) from the converter's
+	// environment — the child process has no use for ketch credentials.
+	cmd.Env = config.ScrubbedEnviron()
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	return cmd.Run()

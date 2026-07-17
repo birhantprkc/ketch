@@ -46,6 +46,7 @@ type configInfo struct {
 	SPAMarkers                         []string          `json:"spa_markers,omitempty"`
 	ExternalPDFToMDConverterCommand    string            `json:"external_pdf_to_md_converter_command,omitempty"`
 	ExternalPDFToMDConverterTimeoutSec int               `json:"external_pdf_to_md_converter_timeout_sec"`
+	EnvOverrides                       []config.Override `json:"env_overrides,omitempty"`
 	AvailableBackends                  []string          `json:"available_backends"`
 	AvailableCodeBackends              []string          `json:"available_code_backends"`
 	AvailableDocBackends               []string          `json:"available_doc_backends"`
@@ -85,9 +86,11 @@ func init() {
 }
 
 func runConfigShow(_ *cobra.Command, _ []string) error {
-	c := config.Load()
 	path, _ := config.Path()
-	info := buildConfigInfo(c, path)
+	// cfg/cfgResult were loaded at init (file + KETCH_* env overlay); a bad
+	// env value already errored in PersistentPreRunE before reaching here.
+	info := buildConfigInfo(cfg, path)
+	info.EnvOverrides = cfgResult.Overrides
 
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
@@ -151,7 +154,9 @@ func runConfigInit(_ *cobra.Command, _ []string) error {
 }
 
 func runConfigSet(_ *cobra.Command, args []string) error {
-	c := config.Load()
+	// LoadFile, not Load: `config set` must round-trip the file as-is and
+	// never persist env-derived (KETCH_*) values into it.
+	c := config.LoadFile()
 	key, value := args[0], args[1]
 
 	if err := applyConfigSet(&c, key, value); err != nil {

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/1broseidon/ketch/config"
 	"github.com/1broseidon/ketch/cookies"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
@@ -29,7 +30,9 @@ func NewBrowserConn(binPath string) (BrowserConn, error) {
 // NewBrowserConnWithCookies launches a headless browser and injects cookies
 // from jar (which may be nil) before each navigation.
 func NewBrowserConnWithCookies(binPath string, jar *cookies.Jar) (BrowserConn, error) {
-	l := launcher.New().Bin(binPath).Headless(true)
+	// Scrub KETCH_* secret vars (API keys, tokens) from the browser's
+	// environment — the child process has no use for ketch credentials.
+	l := launcher.New().Bin(binPath).Headless(true).Env(config.ScrubbedEnviron()...)
 	u, err := l.Launch()
 	if err != nil {
 		return nil, fmt.Errorf("launch browser: %w", err)
